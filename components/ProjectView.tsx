@@ -13,7 +13,7 @@ import { STATUSES, progressOf, type Member, type Project, type Task, type TaskSt
 import { THEMES } from "@/lib/themes";
 import { areaColor } from "@/lib/areas";
 import { participantsOf } from "@/lib/participants";
-import { addTask, deleteProject, deleteTask, setTaskArea, setTaskAssignee, setTaskStatus } from "@/app/actions";
+import { addTask, deleteProject, deleteTask, setTaskArea, setTaskAssignee, setTaskStatus, updateTask } from "@/app/actions";
 
 const TABS = [
   { id: "tasks", label: "Tareas" },
@@ -34,6 +34,9 @@ export default function ProjectView({ project, members }: { project: Project; me
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<TaskStatus | null>(null);
   const [filter, setFilter] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editDate, setEditDate] = useState("");
   const [, start] = useTransition();
   const areas = project.areas ?? [];
   const people = participantsOf(project, members);
@@ -52,6 +55,22 @@ export default function ProjectView({ project, members }: { project: Project; me
   function remove(taskId: string) {
     setTasks((ts) => ts.filter((t) => t.id !== taskId));
     start(() => deleteTask(project.id, taskId));
+  }
+  function startEdit(t: Task) {
+    setEditingId(t.id);
+    setEditTitle(t.title);
+    setEditDate(t.dueDate ?? "");
+  }
+  function saveEdit(e?: React.FormEvent) {
+    e?.preventDefault();
+    const title = editTitle.trim();
+    const id = editingId;
+    if (!id) return;
+    setEditingId(null);
+    if (!title) return;
+    const dueDate = editDate || undefined;
+    setTasks((ts) => ts.map((x) => (x.id === id ? { ...x, title, dueDate } : x)));
+    start(() => updateTask(project.id, id, { title, dueDate }));
   }
   // Pulsar la etiqueta de una tarea rota entre las partes (y "sin parte")
   function cycleArea(t: Task) {
@@ -226,7 +245,7 @@ export default function ProjectView({ project, members }: { project: Project; me
                 {colTasks.map((t) => (
                   <div
                     key={t.id}
-                    draggable
+                    draggable={editingId !== t.id}
                     onDragStart={() => setDragId(t.id)}
                     onDragEnd={() => { setDragId(null); setOverCol(null); }}
                     className={`group flex items-start gap-3 rounded-2xl bg-white p-3.5 shadow-sm cursor-grab active:cursor-grabbing ${dragId === t.id ? "opacity-40" : ""}`}
@@ -246,7 +265,39 @@ export default function ProjectView({ project, members }: { project: Project; me
                       {t.status !== "todo" && <Check size={14} strokeWidth={3} />}
                     </button>
                     <div className="min-w-0 flex-1">
-                      <p className={t.status === "done" ? "text-muted line-through" : ""}>{t.title}</p>
+                      {editingId === t.id ? (
+                        <form onSubmit={saveEdit} className="flex flex-col gap-2">
+                          <input
+                            autoFocus
+                            value={editTitle}
+                            onChange={(e) => setEditTitle(e.target.value)}
+                            onKeyDown={(e) => e.key === "Escape" && setEditingId(null)}
+                            className="w-full rounded-lg border border-line px-2 py-1 text-base outline-none focus:border-primary sm:text-[15px]"
+                          />
+                          <div className="flex items-center gap-2">
+                            <input
+                              type="date"
+                              value={editDate}
+                              onChange={(e) => setEditDate(e.target.value)}
+                              className="rounded-lg border border-line px-2 py-1 text-sm text-muted"
+                            />
+                            <button type="submit" className="ml-auto rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white">
+                              Guardar
+                            </button>
+                            <button type="button" onClick={() => setEditingId(null)} className="text-sm text-muted">
+                              Cancelar
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <p
+                          onClick={() => startEdit(t)}
+                          title="Pulsa para editar"
+                          className={`cursor-text break-words ${t.status === "done" ? "text-muted line-through" : ""}`}
+                        >
+                          {t.title}
+                        </p>
+                      )}
                       {areas.length > 0 && (
                         <button
                           onClick={() => cycleArea(t)}
@@ -261,7 +312,7 @@ export default function ProjectView({ project, members }: { project: Project; me
                           {t.area && areas.includes(t.area) ? t.area : "Sin parte"}
                         </button>
                       )}
-                      {t.dueDate && (
+                      {t.dueDate && editingId !== t.id && (
                         <p className="mt-1 flex items-center gap-1.5 text-sm text-muted">
                           <CalendarDays size={14} /> {fmt(t.dueDate)}
                         </p>

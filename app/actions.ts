@@ -177,6 +177,32 @@ export async function setTaskAssignee(projectId: string, taskId: string, assigne
   revalidatePath(`/projects/${projectId}`);
 }
 
+export async function updateTask(
+  projectId: string,
+  taskId: string,
+  input: { title: string; dueDate?: string },
+) {
+  const me = await requireUser();
+  const title = input.title.trim().slice(0, 200);
+  if (!title) return;
+  const dueDate = input.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(input.dueDate) ? input.dueDate : undefined;
+  await mutateDB((db) => {
+    const p = db.projects.find((x) => x.id === projectId);
+    const t = p?.tasks.find((x) => x.id === taskId);
+    if (!p || !t) return;
+    const oldTitle = t.title;
+    if (t.title !== title) {
+      t.title = title;
+      log(p, me.id, "task", `renombró «${oldTitle}» a «${title}»`);
+    }
+    if ((t.dueDate ?? "") !== (dueDate ?? "")) {
+      t.dueDate = dueDate;
+      log(p, me.id, "task", dueDate ? `cambió la fecha de «${title}» al ${dueDate}` : `quitó la fecha de «${title}»`);
+    }
+  });
+  revalidatePath(`/projects/${projectId}`);
+}
+
 export async function deleteTask(projectId: string, taskId: string) {
   const me = await requireUser();
   await mutateDB((db) => {
