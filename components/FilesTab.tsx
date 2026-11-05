@@ -5,7 +5,7 @@ import { ExternalLink, Link2, Plus, X } from "lucide-react";
 import Avatar from "./Avatar";
 import RelativeTime from "./RelativeTime";
 import { addLink, deleteLink } from "@/app/actions";
-import { THEMES } from "@/lib/themes";
+import { getTheme } from "@/lib/themes";
 import type { Member, Project } from "@/lib/types";
 
 const INPUT =
@@ -25,7 +25,7 @@ export default function FilesTab({ project, members }: { project: Project; membe
   const [error, setError] = useState("");
   const [pending, start] = useTransition();
   const links = [...(project.links ?? [])].reverse(); // los más recientes primero
-  const accent = THEMES[project.theme].accent;
+  const accent = getTheme(project.theme).accent;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();

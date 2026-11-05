@@ -1,5 +1,4 @@
-import { THEMES } from "@/lib/themes";
-import type { ThemeId } from "@/lib/types";
+import { getTheme } from "@/lib/themes";
 
 /** Portada abstracta con curvas suaves, inspirada en el diseño de referencia. */
 export default function Cover({
@@ -7,11 +6,11 @@ export default function Cover({
   className = "",
   children,
 }: {
-  theme: ThemeId;
+  theme: string;
   className?: string;
   children?: React.ReactNode;
 }) {
-  const t = THEMES[theme];
+  const t = getTheme(theme);
   return (
     <div
       className={`relative overflow-hidden ${className}`}

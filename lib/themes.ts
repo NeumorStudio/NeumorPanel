@@ -61,3 +61,46 @@ export const THEMES: Record<ThemeId, Theme> = {
 };
 
 export const THEME_LIST = Object.values(THEMES);
+
+// ---------- Colores personalizados ----------
+
+const HEX = /^#[0-9a-f]{6}$/i;
+export const isHex = (v: string) => HEX.test(v);
+
+/** Acepta un preset ("blue") o un color "#rrggbb"; si no, vuelve al azul. */
+export function normalizeTheme(v: string | undefined): string {
+  if (!v) return "blue";
+  if (v in THEMES) return v;
+  return isHex(v) ? v.toLowerCase() : "blue";
+}
+
+type RGB = [number, number, number];
+const toRgb = (hex: string): RGB => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16)) as RGB;
+const toHex = (c: RGB) => "#" + c.map((x) => Math.round(Math.max(0, Math.min(255, x))).toString(16).padStart(2, "0")).join("");
+const mix = (a: RGB, b: RGB, t: number): RGB => [0, 1, 2].map((i) => a[i] + (b[i] - a[i]) * t) as RGB;
+const luminance = ([r, g, b]: RGB) => (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+
+const WHITE: RGB = [255, 255, 255];
+const BLACK: RGB = [0, 0, 0];
+
+/** Construye un tema completo (portada, barra, pestañas) a partir de un solo color. */
+export function themeFromColor(hex: string): Theme {
+  let base = toRgb(hex);
+  // un color casi blanco no se vería en la barra de progreso: lo oscurecemos un poco
+  if (luminance(base) > 0.78) base = mix(base, BLACK, 0.3);
+  const c = (rgb: RGB) => toHex(rgb);
+  return {
+    id: "blue", // no se usa: es un tema derivado
+    label: "Personalizado",
+    accent: c(base),
+    bg: `linear-gradient(135deg,${c(base)} 0%,${c(mix(base, WHITE, 0.3))} 55%,${c(mix(base, WHITE, 0.55))} 100%)`,
+    shapeA: `radial-gradient(circle at 55% 85%,${c(mix(base, BLACK, 0.28))} 0%,${c(base)} 60%,${c(mix(base, WHITE, 0.15))} 100%)`,
+    shapeB: "linear-gradient(120deg,rgba(255,255,255,0.05),rgba(255,255,255,0.42))",
+  };
+}
+
+/** Tema de un proyecto: preset o color personalizado. */
+export function getTheme(theme: string): Theme {
+  if (theme in THEMES) return THEMES[theme as ThemeId];
+  return isHex(theme) ? themeFromColor(theme) : THEMES.blue;
+}

@@ -40,7 +40,7 @@ export type Project = {
   name: string;
   category: string;
   description: string;
-  theme: ThemeId;
+  theme: string; // preset ("blue") o color personalizado ("#8a3ffc")
   dueDate?: string;
   tasks: Task[];
   areas?: string[]; // partes del proyecto, para etiquetar tareas

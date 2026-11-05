@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { mutateDB } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import { THEME_LIST } from "@/lib/themes";
+import { THEME_LIST, normalizeTheme } from "@/lib/themes";
 import { normalizeAreas } from "@/lib/areas";
 import { participantsOf } from "@/lib/participants";
 import { STATUSES, type ActivityType, type Project, type TaskStatus, type ThemeId } from "@/lib/types";
@@ -13,7 +13,7 @@ type ProjectInput = {
   name: string;
   category: string;
   description: string;
-  theme: ThemeId;
+  theme: string;
   dueDate?: string;
   areas?: string[];
   members?: string[];
@@ -47,7 +47,7 @@ export async function createProject(input: ProjectInput) {
       name,
       category: input.category.trim(),
       description: input.description.trim(),
-      theme: input.theme,
+      theme: normalizeTheme(input.theme),
       dueDate: input.dueDate || undefined,
       areas: normalizeAreas(input.areas),
       members: validIds(db.members, input.members),
@@ -77,7 +77,7 @@ export async function updateProject(id: string, input: ProjectInput) {
     p.name = name;
     p.category = input.category.trim();
     p.description = input.description.trim();
-    p.theme = input.theme;
+    p.theme = normalizeTheme(input.theme);
     p.dueDate = input.dueDate || undefined;
     if (input.areas) {
       const before = (p.areas ?? []).join("|");

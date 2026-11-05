@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { Check, X } from "lucide-react";
-import { THEME_LIST } from "@/lib/themes";
+import { Check, Plus, X } from "lucide-react";
+import { THEME_LIST, THEMES, getTheme, isHex } from "@/lib/themes";
+import ColorWheel from "./ColorWheel";
 import { participantsOf } from "@/lib/participants";
 import Avatar from "./Avatar";
 import { MAX_AREAS, MAX_AREA_LENGTH, areaColor, normalizeAreas } from "@/lib/areas";
-import type { Member, Project, ThemeId } from "@/lib/types";
+import type { Member, Project } from "@/lib/types";
 import { createProject, updateProject } from "@/app/actions";
 
 const INPUT =
@@ -25,7 +26,8 @@ export default function ProjectDialog({
   const [category, setCategory] = useState(project?.category ?? "");
   const [description, setDescription] = useState(project?.description ?? "");
   const [dueDate, setDueDate] = useState(project?.dueDate ?? "");
-  const [theme, setTheme] = useState<ThemeId>(project?.theme ?? "blue");
+  const [theme, setTheme] = useState<string>(project?.theme ?? "blue");
+  const [wheelOpen, setWheelOpen] = useState(false);
   const [areas, setAreas] = useState<string[]>(project?.areas ?? []);
   const [areaDraft, setAreaDraft] = useState("");
   const [people, setPeople] = useState<string[]>(
@@ -172,24 +174,61 @@ export default function ProjectDialog({
           </div>
         </div>
 
-        <div className="flex gap-2.5">
-          {THEME_LIST.map((t) => (
+        <div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            {THEME_LIST.map((t) => (
+              <button
+                type="button"
+                key={t.id}
+                title={t.label}
+                onClick={() => {
+                  setTheme(t.id);
+                  setWheelOpen(false);
+                }}
+                className="relative size-9 rounded-full ring-offset-2 transition-transform hover:scale-110"
+                style={{
+                  background: t.bg,
+                  boxShadow: theme === t.id ? `0 0 0 2px #fff, 0 0 0 4px ${t.accent}` : undefined,
+                }}
+              >
+                {theme === t.id && (
+                  <Check size={16} className="absolute inset-0 m-auto text-white" strokeWidth={3} />
+                )}
+              </button>
+            ))}
             <button
               type="button"
-              key={t.id}
-              title={t.label}
-              onClick={() => setTheme(t.id)}
-              className="relative size-9 rounded-full ring-offset-2 transition-transform hover:scale-110"
-              style={{
-                background: t.bg,
-                boxShadow: theme === t.id ? `0 0 0 2px #fff, 0 0 0 4px ${t.accent}` : undefined,
+              title="Color personalizado"
+              aria-label="Color personalizado"
+              aria-expanded={wheelOpen}
+              onClick={() => {
+                // al abrir por primera vez, parte del color que ya estaba elegido
+                if (!wheelOpen && !isHex(theme)) setTheme(getTheme(theme).accent);
+                setWheelOpen((o) => !o);
               }}
+              className="relative grid size-9 place-items-center rounded-full border-2 border-dashed border-[#c4c7d6] text-muted transition-transform hover:scale-110"
+              style={
+                isHex(theme)
+                  ? {
+                      background: getTheme(theme).bg,
+                      border: "none",
+                      boxShadow: `0 0 0 2px #fff, 0 0 0 4px ${getTheme(theme).accent}`,
+                    }
+                  : undefined
+              }
             >
-              {theme === t.id && (
-                <Check size={16} className="absolute inset-0 m-auto text-white" strokeWidth={3} />
+              {isHex(theme) ? (
+                <Check size={16} className="text-white" strokeWidth={3} />
+              ) : (
+                <Plus size={16} />
               )}
             </button>
-          ))}
+          </div>
+          {wheelOpen && (
+            <div className="mt-3 rounded-2xl bg-[#f6f7fb] p-4">
+              <ColorWheel value={isHex(theme) ? theme : THEMES.blue.accent} onChange={setTheme} />
+            </div>
+          )}
         </div>
 
         <button

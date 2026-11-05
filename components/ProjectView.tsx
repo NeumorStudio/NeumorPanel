@@ -11,7 +11,7 @@ import FilesTab from "./FilesTab";
 import ActivityTab from "./ActivityTab";
 import OptionMenu from "./OptionMenu";
 import { STATUSES, progressOf, type Member, type Project, type Task, type TaskStatus } from "@/lib/types";
-import { THEMES } from "@/lib/themes";
+import { getTheme } from "@/lib/themes";
 import { areaColor } from "@/lib/areas";
 import { participantsOf } from "@/lib/participants";
 import { addTask, deleteProject, deleteTask, setTaskArea, setTaskAssignee, setTaskStatus, updateTask } from "@/app/actions";
@@ -42,7 +42,7 @@ export default function ProjectView({ project, members }: { project: Project; me
   const areas = project.areas ?? [];
   const people = participantsOf(project, members);
   const activeFilter = filter && areas.includes(filter) ? filter : null;
-  const accent = THEMES[project.theme].accent;
+  const accent = getTheme(project.theme).accent;
 
   function move(taskId: string, status: TaskStatus) {
     setTasks((ts) => ts.map((t) => (t.id === taskId ? { ...t, status } : t)));
