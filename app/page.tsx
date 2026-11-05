@@ -2,6 +2,7 @@ import Link from "next/link";
 import { readDB } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { progressOf } from "@/lib/types";
+import { getTheme } from "@/lib/themes";
 import Cover from "@/components/Cover";
 import ProgressBar from "@/components/ProgressBar";
 import NewProjectButton from "@/components/NewProjectButton";
@@ -26,13 +27,26 @@ export default async function Home() {
         </div>
       ) : (
         <div className="grid gap-6 sm:grid-cols-2">
-          {projects.map((p) => (
+          {projects.map((p) => {
+            const pending = p.tasks.filter((t) => t.status !== "done").length;
+            return (
             <Link
               key={p.id}
               href={`/projects/${p.id}`}
               className="group overflow-hidden rounded-3xl bg-white shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
             >
-              <Cover theme={p.theme} className="h-44" />
+              <Cover theme={p.theme} className="h-44">
+                {pending > 0 && (
+                  <span
+                    className="absolute right-4 top-4 flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-sm font-semibold shadow-sm backdrop-blur"
+                    title={`${pending} ${pending === 1 ? "tarea pendiente" : "tareas pendientes"}`}
+                  >
+                    <span className="size-2 rounded-full" style={{ background: getTheme(p.theme).accent }} />
+                    <span className="tabular-nums">{pending}</span>
+                    <span className="font-medium text-muted">{pending === 1 ? "pendiente" : "pendientes"}</span>
+                  </span>
+                )}
+              </Cover>
               <div className="p-5">
                 <h2 className="text-xl font-semibold">{p.name}</h2>
                 <p className="mt-0.5 text-muted min-h-6">{p.category}</p>
@@ -41,7 +55,8 @@ export default async function Home() {
                 </div>
               </div>
             </Link>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
