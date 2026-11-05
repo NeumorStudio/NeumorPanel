@@ -6,12 +6,14 @@ import { getTheme } from "@/lib/themes";
 import Cover from "@/components/Cover";
 import ProgressBar from "@/components/ProgressBar";
 import NewProjectButton from "@/components/NewProjectButton";
+import PendingPill from "@/components/PendingPill";
 
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
   await requireUser();
   const { projects, members } = await readDB();
+  const byId = new Map(members.map((m) => [m.id, m]));
 
   return (
     <div>
@@ -28,7 +30,14 @@ export default async function Home() {
       ) : (
         <div className="grid gap-6 sm:grid-cols-2">
           {projects.map((p) => {
-            const pending = p.tasks.filter((t) => t.status !== "done").length;
+            const pending = p.tasks
+              .filter((t) => t.status !== "done")
+              .map((t) => ({
+                id: t.id,
+                title: t.title,
+                status: t.status,
+                assignee: t.assignee ? byId.get(t.assignee) : undefined,
+              }));
             return (
             <Link
               key={p.id}
@@ -36,15 +45,8 @@ export default async function Home() {
               className="group overflow-hidden rounded-3xl bg-white shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
             >
               <Cover theme={p.theme} className="h-44">
-                {pending > 0 && (
-                  <span
-                    className="absolute right-4 top-4 flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-sm font-semibold shadow-sm backdrop-blur"
-                    title={`${pending} ${pending === 1 ? "tarea pendiente" : "tareas pendientes"}`}
-                  >
-                    <span className="size-2 rounded-full" style={{ background: getTheme(p.theme).accent }} />
-                    <span className="tabular-nums">{pending}</span>
-                    <span className="font-medium text-muted">{pending === 1 ? "pendiente" : "pendientes"}</span>
-                  </span>
+                {pending.length > 0 && (
+                  <PendingPill tasks={pending} accent={getTheme(p.theme).accent} href={`/projects/${p.id}`} />
                 )}
               </Cover>
               <div className="p-5">
