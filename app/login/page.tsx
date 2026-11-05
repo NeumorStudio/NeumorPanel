@@ -10,7 +10,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const { error } = await searchParams;
 
   return (
-    <div className="grid min-h-[80vh] place-items-center">
+    <div className="fixed inset-0 z-40 grid place-items-center bg-background p-4">
       <div className="w-full max-w-sm rounded-3xl bg-white p-8 text-center shadow-card">
         <span className="mx-auto mb-5 grid w-fit grid-cols-2 gap-1.5">
           {[0, 1, 2, 3].map((i) => (
