@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, Check, MoreHorizontal, Pencil, Plus, Trash2, Users, X } from "lucide-react";
+import { ArrowLeft, CalendarDays, UserPlus, Check, MoreHorizontal, Pencil, Plus, Trash2, Users, X } from "lucide-react";
 import Cover from "./Cover";
 import ProgressBar from "./ProgressBar";
 import ProjectDialog from "./ProjectDialog";
@@ -12,7 +12,8 @@ import ActivityTab from "./ActivityTab";
 import { STATUSES, progressOf, type Member, type Project, type Task, type TaskStatus } from "@/lib/types";
 import { THEMES } from "@/lib/themes";
 import { areaColor } from "@/lib/areas";
-import { addTask, deleteProject, deleteTask, setTaskArea, setTaskStatus } from "@/app/actions";
+import { participantsOf } from "@/lib/participants";
+import { addTask, deleteProject, deleteTask, setTaskArea, setTaskAssignee, setTaskStatus } from "@/app/actions";
 
 const TABS = [
   { id: "tasks", label: "Tareas" },
@@ -35,6 +36,7 @@ export default function ProjectView({ project, members }: { project: Project; me
   const [filter, setFilter] = useState<string | null>(null);
   const [, start] = useTransition();
   const areas = project.areas ?? [];
+  const people = participantsOf(project, members);
   const activeFilter = filter && areas.includes(filter) ? filter : null;
   const accent = THEMES[project.theme].accent;
 
@@ -42,8 +44,8 @@ export default function ProjectView({ project, members }: { project: Project; me
     setTasks((ts) => ts.map((t) => (t.id === taskId ? { ...t, status } : t)));
     start(() => setTaskStatus(project.id, taskId, status));
   }
-  function add(status: TaskStatus, title: string, dueDate?: string, area?: string) {
-    const task: Task = { id: crypto.randomUUID(), title, status, dueDate: dueDate || undefined, area };
+  function add(status: TaskStatus, title: string, dueDate?: string, area?: string, assignee?: string) {
+    const task: Task = { id: crypto.randomUUID(), title, status, dueDate: dueDate || undefined, area, assignee };
     setTasks((ts) => [...ts, task]);
     start(() => addTask(project.id, task));
   }
@@ -57,6 +59,13 @@ export default function ProjectView({ project, members }: { project: Project; me
     const area = i + 1 < areas.length ? areas[i + 1] : undefined;
     setTasks((ts) => ts.map((x) => (x.id === t.id ? { ...x, area } : x)));
     start(() => setTaskArea(project.id, t.id, area ?? null));
+  }
+  // Pulsar el responsable de una tarea rota entre los participantes (y "sin asignar")
+  function cycleAssignee(t: Task) {
+    const i = people.findIndex((m) => m.id === t.assignee);
+    const assignee = i + 1 < people.length ? people[i + 1].id : undefined;
+    setTasks((ts) => ts.map((x) => (x.id === t.id ? { ...x, assignee } : x)));
+    start(() => setTaskAssignee(project.id, t.id, assignee ?? null));
   }
   function next(s: TaskStatus): TaskStatus {
     return s === "todo" ? "doing" : s === "doing" ? "done" : "todo";
@@ -131,7 +140,8 @@ export default function ProjectView({ project, members }: { project: Project; me
             <div>
               <p className="text-sm text-muted">Equipo</p>
               <div className="mt-1 flex -space-x-2">
-                {members.map((m) => (
+                {people.length === 0 && <span className="text-sm text-muted">Sin participantes</span>}
+                {people.map((m) => (
                   <Avatar key={m.id} member={m} size={36} className="border-2 border-[#eff0f6]" />
                 ))}
               </div>
@@ -257,6 +267,26 @@ export default function ProjectView({ project, members }: { project: Project; me
                         </p>
                       )}
                     </div>
+                    {people.length > 0 && (
+                      <button
+                        onClick={() => cycleAssignee(t)}
+                        title={
+                          people.find((m) => m.id === t.assignee)
+                            ? `Responsable: ${people.find((m) => m.id === t.assignee)?.name} (pulsa para cambiar)`
+                            : "Asignar responsable"
+                        }
+                        className="shrink-0 rounded-full transition-transform hover:scale-110"
+                        aria-label="Cambiar responsable"
+                      >
+                        {people.find((m) => m.id === t.assignee) ? (
+                          <Avatar member={people.find((m) => m.id === t.assignee)!} size={28} />
+                        ) : (
+                          <span className="grid size-7 place-items-center rounded-full border border-dashed border-[#c4c7d6] text-[#b6b9c9]">
+                            <UserPlus size={14} />
+                          </span>
+                        )}
+                      </button>
+                    )}
                     <button
                       onClick={() => remove(t.id)}
                       className="text-[#b6b9c9] p-1 transition hover:text-red-500 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
@@ -268,8 +298,9 @@ export default function ProjectView({ project, members }: { project: Project; me
                 ))}
                 <AddTask
                   areas={areas}
+                  people={people}
                   defaultArea={activeFilter ?? undefined}
-                  onAdd={(title, date, area) => add(col.id, title, date, area)}
+                  onAdd={(title, date, area, assignee) => add(col.id, title, date, area, assignee)}
                 />
               </div>
             </div>
@@ -278,7 +309,7 @@ export default function ProjectView({ project, members }: { project: Project; me
       </div>
       )}
 
-      {editing && <ProjectDialog project={project} onClose={() => setEditing(false)} />}
+      {editing && <ProjectDialog project={project} members={members} onClose={() => setEditing(false)} />}
     </div>
   );
 }
@@ -286,22 +317,25 @@ export default function ProjectView({ project, members }: { project: Project; me
 function AddTask({
   onAdd,
   areas,
+  people,
   defaultArea,
 }: {
-  onAdd: (title: string, date?: string, area?: string) => void;
+  onAdd: (title: string, date?: string, area?: string, assignee?: string) => void;
   areas: string[];
+  people: Member[];
   defaultArea?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
   const [area, setArea] = useState("");
+  const [assignee, setAssignee] = useState("");
   const chosenArea = area && areas.includes(area) ? area : (defaultArea ?? "");
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
-    onAdd(title.trim(), date, chosenArea || undefined);
+    onAdd(title.trim(), date, chosenArea || undefined, people.some((m) => m.id === assignee) ? assignee : undefined);
     setTitle("");
     setDate("");
   }
@@ -337,6 +371,21 @@ function AddTask({
           {areas.map((a) => (
             <option key={a} value={a}>
               {a}
+            </option>
+          ))}
+        </select>
+      )}
+      {people.length > 0 && (
+        <select
+          value={people.some((m) => m.id === assignee) ? assignee : ""}
+          onChange={(e) => setAssignee(e.target.value)}
+          className="rounded-lg border border-line bg-white px-2 py-1.5 text-base text-muted sm:text-sm"
+          aria-label="Responsable"
+        >
+          <option value="">Sin asignar</option>
+          {people.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
             </option>
           ))}
         </select>

@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { Plus } from "lucide-react";
 import ProjectDialog from "./ProjectDialog";
+import type { Member } from "@/lib/types";
 
-export default function NewProjectButton() {
+export default function NewProjectButton({ members }: { members: Member[] }) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -15,7 +16,7 @@ export default function NewProjectButton() {
         <Plus size={20} />
         <span className="hidden sm:inline">Nuevo proyecto</span>
       </button>
-      {open && <ProjectDialog onClose={() => setOpen(false)} />}
+      {open && <ProjectDialog members={members} onClose={() => setOpen(false)} />}
     </>
   );
 }

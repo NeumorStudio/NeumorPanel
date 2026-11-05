@@ -3,8 +3,10 @@
 import { useState, useTransition } from "react";
 import { Check, X } from "lucide-react";
 import { THEME_LIST } from "@/lib/themes";
+import { participantsOf } from "@/lib/participants";
+import Avatar from "./Avatar";
 import { MAX_AREAS, MAX_AREA_LENGTH, areaColor, normalizeAreas } from "@/lib/areas";
-import type { Project, ThemeId } from "@/lib/types";
+import type { Member, Project, ThemeId } from "@/lib/types";
 import { createProject, updateProject } from "@/app/actions";
 
 const INPUT =
@@ -12,9 +14,11 @@ const INPUT =
 
 export default function ProjectDialog({
   project,
+  members,
   onClose,
 }: {
   project?: Project;
+  members: Member[];
   onClose: () => void;
 }) {
   const [name, setName] = useState(project?.name ?? "");
@@ -24,6 +28,9 @@ export default function ProjectDialog({
   const [theme, setTheme] = useState<ThemeId>(project?.theme ?? "blue");
   const [areas, setAreas] = useState<string[]>(project?.areas ?? []);
   const [areaDraft, setAreaDraft] = useState("");
+  const [people, setPeople] = useState<string[]>(
+    () => participantsOf(project ?? {}, members).map((m) => m.id),
+  );
   const [pending, start] = useTransition();
 
   function addArea() {
@@ -36,7 +43,7 @@ export default function ProjectDialog({
     e.preventDefault();
     if (!name.trim()) return;
     start(async () => {
-      const input = { name, category, description, theme, dueDate, areas: normalizeAreas([...areas, areaDraft]) };
+      const input = { name, category, description, theme, dueDate, areas: normalizeAreas([...areas, areaDraft]), members: people };
       if (project) {
         await updateProject(project.id, input);
         onClose();
@@ -98,6 +105,31 @@ export default function ProjectDialog({
             onChange={(e) => setDueDate(e.target.value)}
           />
         </label>
+
+        <div>
+          <p className="mb-2 text-sm text-muted">Participantes</p>
+          <div className="flex flex-wrap gap-2">
+            {members.map((m) => {
+              const on = people.includes(m.id);
+              return (
+                <button
+                  type="button"
+                  key={m.id}
+                  onClick={() => setPeople(on ? people.filter((x) => x !== m.id) : [...people, m.id])}
+                  aria-pressed={on}
+                  className={`flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-sm transition ${
+                    on ? "bg-[#e6ecff] font-medium text-[#2f4fb8] ring-1 ring-primary/40" : "bg-[#f1f2f7] text-muted"
+                  }`}
+                >
+                  <span className={on ? "" : "opacity-50 grayscale"}>
+                    <Avatar member={m} size={26} />
+                  </span>
+                  {m.name}
+                </button>
+              );
+            })}
+          </div>
+        </div>
 
         <div>
           <p className="mb-2 text-sm text-muted">

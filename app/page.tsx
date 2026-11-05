@@ -10,13 +10,13 @@ export const dynamic = "force-dynamic";
 
 export default async function Home() {
   await requireUser();
-  const { projects } = await readDB();
+  const { projects, members } = await readDB();
 
   return (
     <div>
       <header className="flex items-center justify-between gap-4 mb-8">
         <h1 className="text-4xl sm:text-5xl font-bold tracking-tight">Proyectos</h1>
-        <NewProjectButton />
+        <NewProjectButton members={members} />
       </header>
 
       {projects.length === 0 ? (

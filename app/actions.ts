@@ -6,6 +6,7 @@ import { mutateDB } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { THEME_LIST } from "@/lib/themes";
 import { normalizeAreas } from "@/lib/areas";
+import { participantsOf } from "@/lib/participants";
 import { STATUSES, type ActivityType, type Project, type TaskStatus, type ThemeId } from "@/lib/types";
 
 type ProjectInput = {
@@ -15,9 +16,16 @@ type ProjectInput = {
   theme: ThemeId;
   dueDate?: string;
   areas?: string[];
+  members?: string[];
 };
 
 const MAX_ACTIVITY = 200;
+
+/** Solo ids que existen en el equipo; si no se indica lista, todo el equipo. */
+function validIds(team: { id: string }[], ids?: string[]): string[] {
+  const all = team.map((m) => m.id);
+  return ids ? all.filter((id) => ids.includes(id)) : all;
+}
 const statusLabel = (s: TaskStatus) => STATUSES.find((x) => x.id === s)?.label ?? s;
 
 /** Añade una entrada al historial del proyecto (la más reciente primero). */
@@ -42,6 +50,7 @@ export async function createProject(input: ProjectInput) {
       theme: input.theme,
       dueDate: input.dueDate || undefined,
       areas: normalizeAreas(input.areas),
+      members: validIds(db.members, input.members),
       tasks: [],
       createdAt: new Date().toISOString(),
     };
@@ -77,6 +86,14 @@ export async function updateProject(id: string, input: ProjectInput) {
       for (const t of p.tasks) if (t.area && !p.areas.includes(t.area)) delete t.area;
       if (before !== p.areas.join("|") && changes[0] === "editó el proyecto") changes[0] = "cambió las partes del proyecto";
     }
+    if (input.members) {
+      const before = participantsOf(p, db.members).map((m) => m.id).sort().join("|");
+      p.members = validIds(db.members, input.members);
+      // las tareas de quien deja el proyecto se quedan sin responsable
+      for (const t of p.tasks) if (t.assignee && !p.members.includes(t.assignee)) delete t.assignee;
+      if (before !== [...p.members].sort().join("|")) changes.push("cambió los participantes del proyecto");
+    }
+    if (changes.length > 1 && changes[0] === "editó el proyecto") changes.shift();
     for (const c of changes) log(p, me.id, "project", c);
   });
   revalidatePath("/");
@@ -97,7 +114,7 @@ export async function deleteProject(id: string) {
 
 export async function addTask(
   projectId: string,
-  task: { id: string; title: string; status: TaskStatus; dueDate?: string; area?: string },
+  task: { id: string; title: string; status: TaskStatus; dueDate?: string; area?: string; assignee?: string },
 ) {
   const me = await requireUser();
   const title = task.title.trim();
@@ -106,7 +123,8 @@ export async function addTask(
     const p = db.projects.find((x) => x.id === projectId);
     if (!p) return;
     const area = task.area && p.areas?.includes(task.area) ? task.area : undefined;
-    p.tasks.push({ ...task, title, area });
+    const assignee = participantsOf(p, db.members).find((m) => m.id === task.assignee)?.id;
+    p.tasks.push({ ...task, title, area, assignee });
     log(p, me.id, "task", `creó la tarea «${title}»`);
   });
   revalidatePath(`/projects/${projectId}`);
@@ -137,6 +155,24 @@ export async function setTaskArea(projectId: string, taskId: string, area: strin
     if (!p || !t) return;
     if (area && p.areas?.includes(area)) t.area = area;
     else delete t.area;
+  });
+  revalidatePath(`/projects/${projectId}`);
+}
+
+export async function setTaskAssignee(projectId: string, taskId: string, assignee: string | null) {
+  const me = await requireUser();
+  await mutateDB((db) => {
+    const p = db.projects.find((x) => x.id === projectId);
+    const t = p?.tasks.find((x) => x.id === taskId);
+    if (!p || !t) return;
+    const who = participantsOf(p, db.members).find((m) => m.id === assignee);
+    if (who) {
+      t.assignee = who.id;
+      log(p, me.id, "task", `asignó «${t.title}» a ${who.name}`);
+    } else if (t.assignee) {
+      delete t.assignee;
+      log(p, me.id, "task", `quitó el responsable de «${t.title}»`);
+    }
   });
   revalidatePath(`/projects/${projectId}`);
 }
@@ -250,6 +286,10 @@ export async function removeMember(id: string): Promise<{ error?: string }> {
   if (me.id === id) return { error: "No puedes quitarte a ti mismo." };
   await mutateDB((db) => {
     db.members = db.members.filter((m) => m.id !== id);
+    for (const p of db.projects) {
+      if (p.members) p.members = p.members.filter((x) => x !== id);
+      for (const t of p.tasks) if (t.assignee === id) delete t.assignee;
+    }
   });
   revalidatePath("/", "layout");
   return {};

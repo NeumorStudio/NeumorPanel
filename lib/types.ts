@@ -12,6 +12,7 @@ export type Task = {
   status: TaskStatus;
   dueDate?: string; // YYYY-MM-DD
   area?: string; // una de las partes del proyecto (p. ej. "Web", "Cliente")
+  assignee?: string; // id del miembro responsable
 };
 
 export type ThemeId = "blue" | "orange" | "green" | "purple" | "pink" | "teal";
@@ -43,6 +44,7 @@ export type Project = {
   dueDate?: string;
   tasks: Task[];
   areas?: string[]; // partes del proyecto, para etiquetar tareas
+  members?: string[]; // ids de los participantes (si falta: todo el equipo)
   links?: ProjectLink[];
   activity?: Activity[]; // la más reciente primero
   createdAt: string;
