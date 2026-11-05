@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { mutateDB } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { THEME_LIST } from "@/lib/themes";
+import { normalizeAreas } from "@/lib/areas";
 import { STATUSES, type ActivityType, type Project, type TaskStatus, type ThemeId } from "@/lib/types";
 
 type ProjectInput = {
@@ -13,6 +14,7 @@ type ProjectInput = {
   description: string;
   theme: ThemeId;
   dueDate?: string;
+  areas?: string[];
 };
 
 const MAX_ACTIVITY = 200;
@@ -39,6 +41,7 @@ export async function createProject(input: ProjectInput) {
       description: input.description.trim(),
       theme: input.theme,
       dueDate: input.dueDate || undefined,
+      areas: normalizeAreas(input.areas),
       tasks: [],
       createdAt: new Date().toISOString(),
     };
@@ -67,6 +70,13 @@ export async function updateProject(id: string, input: ProjectInput) {
     p.description = input.description.trim();
     p.theme = input.theme;
     p.dueDate = input.dueDate || undefined;
+    if (input.areas) {
+      const before = (p.areas ?? []).join("|");
+      p.areas = normalizeAreas(input.areas);
+      // las tareas de una parte eliminada se quedan sin etiqueta
+      for (const t of p.tasks) if (t.area && !p.areas.includes(t.area)) delete t.area;
+      if (before !== p.areas.join("|") && changes[0] === "editó el proyecto") changes[0] = "cambió las partes del proyecto";
+    }
     for (const c of changes) log(p, me.id, "project", c);
   });
   revalidatePath("/");
@@ -87,7 +97,7 @@ export async function deleteProject(id: string) {
 
 export async function addTask(
   projectId: string,
-  task: { id: string; title: string; status: TaskStatus; dueDate?: string },
+  task: { id: string; title: string; status: TaskStatus; dueDate?: string; area?: string },
 ) {
   const me = await requireUser();
   const title = task.title.trim();
@@ -95,7 +105,8 @@ export async function addTask(
   await mutateDB((db) => {
     const p = db.projects.find((x) => x.id === projectId);
     if (!p) return;
-    p.tasks.push({ ...task, title });
+    const area = task.area && p.areas?.includes(task.area) ? task.area : undefined;
+    p.tasks.push({ ...task, title, area });
     log(p, me.id, "task", `creó la tarea «${title}»`);
   });
   revalidatePath(`/projects/${projectId}`);
@@ -114,6 +125,18 @@ export async function setTaskStatus(projectId: string, taskId: string, status: T
       "task",
       status === "done" ? `completó «${t.title}»` : `movió «${t.title}» a ${statusLabel(status)}`,
     );
+  });
+  revalidatePath(`/projects/${projectId}`);
+}
+
+export async function setTaskArea(projectId: string, taskId: string, area: string | null) {
+  await requireUser();
+  await mutateDB((db) => {
+    const p = db.projects.find((x) => x.id === projectId);
+    const t = p?.tasks.find((x) => x.id === taskId);
+    if (!p || !t) return;
+    if (area && p.areas?.includes(area)) t.area = area;
+    else delete t.area;
   });
   revalidatePath(`/projects/${projectId}`);
 }

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { Check, X } from "lucide-react";
 import { THEME_LIST } from "@/lib/themes";
+import { MAX_AREAS, MAX_AREA_LENGTH, areaColor, normalizeAreas } from "@/lib/areas";
 import type { Project, ThemeId } from "@/lib/types";
 import { createProject, updateProject } from "@/app/actions";
 
@@ -21,13 +22,21 @@ export default function ProjectDialog({
   const [description, setDescription] = useState(project?.description ?? "");
   const [dueDate, setDueDate] = useState(project?.dueDate ?? "");
   const [theme, setTheme] = useState<ThemeId>(project?.theme ?? "blue");
+  const [areas, setAreas] = useState<string[]>(project?.areas ?? []);
+  const [areaDraft, setAreaDraft] = useState("");
   const [pending, start] = useTransition();
+
+  function addArea() {
+    const next = normalizeAreas([...areas, areaDraft]);
+    setAreas(next);
+    setAreaDraft("");
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
     start(async () => {
-      const input = { name, category, description, theme, dueDate };
+      const input = { name, category, description, theme, dueDate, areas: normalizeAreas([...areas, areaDraft]) };
       if (project) {
         await updateProject(project.id, input);
         onClose();
@@ -89,6 +98,47 @@ export default function ProjectDialog({
             onChange={(e) => setDueDate(e.target.value)}
           />
         </label>
+
+        <div>
+          <p className="mb-2 text-sm text-muted">
+            Partes del proyecto <span className="text-xs">(opcional, para etiquetar tareas)</span>
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {areas.map((a) => (
+              <span
+                key={a}
+                className="flex items-center gap-1.5 rounded-full py-1 pl-3 pr-1.5 text-sm font-medium text-white"
+                style={{ background: areaColor(areas, a) }}
+              >
+                {a}
+                <button
+                  type="button"
+                  onClick={() => setAreas(areas.filter((x) => x !== a))}
+                  className="grid size-5 place-items-center rounded-full bg-white/25 hover:bg-white/40"
+                  aria-label={`Quitar ${a}`}
+                >
+                  <X size={12} />
+                </button>
+              </span>
+            ))}
+            {areas.length < MAX_AREAS && (
+              <input
+                value={areaDraft}
+                maxLength={MAX_AREA_LENGTH}
+                onChange={(e) => setAreaDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addArea();
+                  }
+                }}
+                onBlur={() => areaDraft.trim() && addArea()}
+                placeholder={areas.length ? "Otra parte…" : "Ej. Web, App cliente, App admin ⏎"}
+                className="min-w-0 flex-1 basis-40 rounded-full border border-dashed border-[#cfd2e0] bg-transparent px-3 py-1 text-base outline-none focus:border-primary sm:text-sm"
+              />
+            )}
+          </div>
+        </div>
 
         <div className="flex gap-2.5">
           {THEME_LIST.map((t) => (

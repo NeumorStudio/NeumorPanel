@@ -11,7 +11,8 @@ import FilesTab from "./FilesTab";
 import ActivityTab from "./ActivityTab";
 import { STATUSES, progressOf, type Member, type Project, type Task, type TaskStatus } from "@/lib/types";
 import { THEMES } from "@/lib/themes";
-import { addTask, deleteProject, deleteTask, setTaskStatus } from "@/app/actions";
+import { areaColor } from "@/lib/areas";
+import { addTask, deleteProject, deleteTask, setTaskArea, setTaskStatus } from "@/app/actions";
 
 const TABS = [
   { id: "tasks", label: "Tareas" },
@@ -31,21 +32,31 @@ export default function ProjectView({ project, members }: { project: Project; me
   const [tab, setTab] = useState<"tasks" | "files" | "activity">("tasks");
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<TaskStatus | null>(null);
+  const [filter, setFilter] = useState<string | null>(null);
   const [, start] = useTransition();
+  const areas = project.areas ?? [];
+  const activeFilter = filter && areas.includes(filter) ? filter : null;
   const accent = THEMES[project.theme].accent;
 
   function move(taskId: string, status: TaskStatus) {
     setTasks((ts) => ts.map((t) => (t.id === taskId ? { ...t, status } : t)));
     start(() => setTaskStatus(project.id, taskId, status));
   }
-  function add(status: TaskStatus, title: string, dueDate?: string) {
-    const task: Task = { id: crypto.randomUUID(), title, status, dueDate: dueDate || undefined };
+  function add(status: TaskStatus, title: string, dueDate?: string, area?: string) {
+    const task: Task = { id: crypto.randomUUID(), title, status, dueDate: dueDate || undefined, area };
     setTasks((ts) => [...ts, task]);
     start(() => addTask(project.id, task));
   }
   function remove(taskId: string) {
     setTasks((ts) => ts.filter((t) => t.id !== taskId));
     start(() => deleteTask(project.id, taskId));
+  }
+  // Pulsar la etiqueta de una tarea rota entre las partes (y "sin parte")
+  function cycleArea(t: Task) {
+    const i = t.area ? areas.indexOf(t.area) : -1;
+    const area = i + 1 < areas.length ? areas[i + 1] : undefined;
+    setTasks((ts) => ts.map((x) => (x.id === t.id ? { ...x, area } : x)));
+    start(() => setTaskArea(project.id, t.id, area ?? null));
   }
   function next(s: TaskStatus): TaskStatus {
     return s === "todo" ? "doing" : s === "doing" ? "done" : "todo";
@@ -150,10 +161,39 @@ export default function ProjectView({ project, members }: { project: Project; me
       {tab === "files" && <FilesTab project={project} members={members} />}
       {tab === "activity" && <ActivityTab project={project} members={members} />}
 
+      {tab === "tasks" && areas.length > 0 && (
+        <div className="-mt-1 mb-4 flex flex-wrap gap-2">
+          <button
+            onClick={() => setFilter(null)}
+            className={`rounded-full px-3.5 py-1.5 text-sm transition-colors ${
+              activeFilter === null ? "bg-[#161821] text-white" : "bg-[#e8eaf3] text-muted hover:bg-[#dcdfec]"
+            }`}
+          >
+            Todas
+          </button>
+          {areas.map((a) => (
+            <button
+              key={a}
+              onClick={() => setFilter(activeFilter === a ? null : a)}
+              className="rounded-full px-3.5 py-1.5 text-sm transition-colors"
+              style={
+                activeFilter === a
+                  ? { background: areaColor(areas, a), color: "#fff" }
+                  : { background: `${areaColor(areas, a)}1f`, color: areaColor(areas, a) }
+              }
+            >
+              {a}
+            </button>
+          ))}
+        </div>
+      )}
+
       {tab === "tasks" && (
       <div className="grid gap-4 md:grid-cols-3">
         {STATUSES.map((col) => {
-          const colTasks = tasks.filter((t) => t.status === col.id);
+          const colTasks = tasks.filter(
+            (t) => t.status === col.id && (!activeFilter || t.area === activeFilter),
+          );
           return (
             <div
               key={col.id}
@@ -197,6 +237,20 @@ export default function ProjectView({ project, members }: { project: Project; me
                     </button>
                     <div className="min-w-0 flex-1">
                       <p className={t.status === "done" ? "text-muted line-through" : ""}>{t.title}</p>
+                      {areas.length > 0 && (
+                        <button
+                          onClick={() => cycleArea(t)}
+                          title="Cambiar de parte"
+                          className="mt-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80"
+                          style={
+                            t.area && areas.includes(t.area)
+                              ? { background: `${areaColor(areas, t.area)}22`, color: areaColor(areas, t.area) }
+                              : { background: "#eef0f6", color: "#8b8fa6" }
+                          }
+                        >
+                          {t.area && areas.includes(t.area) ? t.area : "Sin parte"}
+                        </button>
+                      )}
                       {t.dueDate && (
                         <p className="mt-1 flex items-center gap-1.5 text-sm text-muted">
                           <CalendarDays size={14} /> {fmt(t.dueDate)}
@@ -212,7 +266,11 @@ export default function ProjectView({ project, members }: { project: Project; me
                     </button>
                   </div>
                 ))}
-                <AddTask onAdd={(title, date) => add(col.id, title, date)} />
+                <AddTask
+                  areas={areas}
+                  defaultArea={activeFilter ?? undefined}
+                  onAdd={(title, date, area) => add(col.id, title, date, area)}
+                />
               </div>
             </div>
           );
@@ -225,15 +283,25 @@ export default function ProjectView({ project, members }: { project: Project; me
   );
 }
 
-function AddTask({ onAdd }: { onAdd: (title: string, date?: string) => void }) {
+function AddTask({
+  onAdd,
+  areas,
+  defaultArea,
+}: {
+  onAdd: (title: string, date?: string, area?: string) => void;
+  areas: string[];
+  defaultArea?: string;
+}) {
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
+  const [area, setArea] = useState("");
+  const chosenArea = area && areas.includes(area) ? area : (defaultArea ?? "");
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
-    onAdd(title.trim(), date);
+    onAdd(title.trim(), date, chosenArea || undefined);
     setTitle("");
     setDate("");
   }
@@ -258,6 +326,21 @@ function AddTask({ onAdd }: { onAdd: (title: string, date?: string) => void }) {
         placeholder="¿Qué hay que hacer?"
         className="w-full bg-transparent outline-none"
       />
+      {areas.length > 0 && (
+        <select
+          value={chosenArea}
+          onChange={(e) => setArea(e.target.value)}
+          className="rounded-lg border border-line bg-white px-2 py-1.5 text-base text-muted sm:text-sm"
+          aria-label="Parte del proyecto"
+        >
+          <option value="">Sin parte</option>
+          {areas.map((a) => (
+            <option key={a} value={a}>
+              {a}
+            </option>
+          ))}
+        </select>
+      )}
       <div className="flex items-center gap-2">
         <input
           type="date"
