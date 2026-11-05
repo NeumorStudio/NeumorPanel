@@ -9,6 +9,7 @@ import ProjectDialog from "./ProjectDialog";
 import Avatar from "./Avatar";
 import FilesTab from "./FilesTab";
 import ActivityTab from "./ActivityTab";
+import OptionMenu from "./OptionMenu";
 import { STATUSES, progressOf, type Member, type Project, type Task, type TaskStatus } from "@/lib/types";
 import { THEMES } from "@/lib/themes";
 import { areaColor } from "@/lib/areas";
@@ -72,19 +73,13 @@ export default function ProjectView({ project, members }: { project: Project; me
     setTasks((ts) => ts.map((x) => (x.id === id ? { ...x, title, dueDate } : x)));
     start(() => updateTask(project.id, id, { title, dueDate }));
   }
-  // Pulsar la etiqueta de una tarea rota entre las partes (y "sin parte")
-  function cycleArea(t: Task) {
-    const i = t.area ? areas.indexOf(t.area) : -1;
-    const area = i + 1 < areas.length ? areas[i + 1] : undefined;
-    setTasks((ts) => ts.map((x) => (x.id === t.id ? { ...x, area } : x)));
-    start(() => setTaskArea(project.id, t.id, area ?? null));
+  function changeArea(t: Task, area: string | null) {
+    setTasks((ts) => ts.map((x) => (x.id === t.id ? { ...x, area: area ?? undefined } : x)));
+    start(() => setTaskArea(project.id, t.id, area));
   }
-  // Pulsar el responsable de una tarea rota entre los participantes (y "sin asignar")
-  function cycleAssignee(t: Task) {
-    const i = people.findIndex((m) => m.id === t.assignee);
-    const assignee = i + 1 < people.length ? people[i + 1].id : undefined;
-    setTasks((ts) => ts.map((x) => (x.id === t.id ? { ...x, assignee } : x)));
-    start(() => setTaskAssignee(project.id, t.id, assignee ?? null));
+  function changeAssignee(t: Task, assignee: string | null) {
+    setTasks((ts) => ts.map((x) => (x.id === t.id ? { ...x, assignee: assignee ?? undefined } : x)));
+    start(() => setTaskAssignee(project.id, t.id, assignee));
   }
   function next(s: TaskStatus): TaskStatus {
     return s === "todo" ? "doing" : s === "doing" ? "done" : "todo";
@@ -299,18 +294,33 @@ export default function ProjectView({ project, members }: { project: Project; me
                         </p>
                       )}
                       {areas.length > 0 && (
-                        <button
-                          onClick={() => cycleArea(t)}
-                          title="Cambiar de parte"
-                          className="mt-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium transition-opacity hover:opacity-80"
-                          style={
-                            t.area && areas.includes(t.area)
-                              ? { background: `${areaColor(areas, t.area)}22`, color: areaColor(areas, t.area) }
-                              : { background: "#eef0f6", color: "#8b8fa6" }
-                          }
-                        >
-                          {t.area && areas.includes(t.area) ? t.area : "Sin parte"}
-                        </button>
+                        <div className="mt-1.5 w-fit">
+                          <OptionMenu
+                            title="Cambiar de parte"
+                            selected={t.area && areas.includes(t.area) ? t.area : null}
+                            onSelect={(v) => changeArea(t, v)}
+                            options={[
+                              { value: null, label: "Sin parte", icon: <span className="size-3 rounded-full bg-[#d5d8e6]" /> },
+                              ...areas.map((a) => ({
+                                value: a,
+                                label: a,
+                                icon: <span className="size-3 rounded-full" style={{ background: areaColor(areas, a) }} />,
+                              })),
+                            ]}
+                            trigger={
+                              <span
+                                className="block rounded-full px-2.5 py-0.5 text-xs font-medium"
+                                style={
+                                  t.area && areas.includes(t.area)
+                                    ? { background: `${areaColor(areas, t.area)}22`, color: areaColor(areas, t.area) }
+                                    : { background: "#eef0f6", color: "#8b8fa6" }
+                                }
+                              >
+                                {t.area && areas.includes(t.area) ? t.area : "Sin parte"}
+                              </span>
+                            }
+                          />
+                        </div>
                       )}
                       {t.dueDate && editingId !== t.id && (
                         <p className="mt-1 flex items-center gap-1.5 text-sm text-muted">
@@ -319,24 +329,37 @@ export default function ProjectView({ project, members }: { project: Project; me
                       )}
                     </div>
                     {people.length > 0 && (
-                      <button
-                        onClick={() => cycleAssignee(t)}
+                      <OptionMenu
+                        align="right"
                         title={
                           people.find((m) => m.id === t.assignee)
-                            ? `Responsable: ${people.find((m) => m.id === t.assignee)?.name} (pulsa para cambiar)`
+                            ? `Responsable: ${people.find((m) => m.id === t.assignee)?.name}`
                             : "Asignar responsable"
                         }
-                        className="shrink-0 rounded-full transition-transform hover:scale-110"
-                        aria-label="Cambiar responsable"
-                      >
-                        {people.find((m) => m.id === t.assignee) ? (
-                          <Avatar member={people.find((m) => m.id === t.assignee)!} size={28} />
-                        ) : (
-                          <span className="grid size-7 place-items-center rounded-full border border-dashed border-[#c4c7d6] text-[#b6b9c9]">
-                            <UserPlus size={14} />
-                          </span>
-                        )}
-                      </button>
+                        selected={people.some((m) => m.id === t.assignee) ? (t.assignee ?? null) : null}
+                        onSelect={(v) => changeAssignee(t, v)}
+                        options={[
+                          {
+                            value: null,
+                            label: "Sin asignar",
+                            icon: (
+                              <span className="grid size-7 place-items-center rounded-full border border-dashed border-[#c4c7d6] text-[#b6b9c9]">
+                                <UserPlus size={14} />
+                              </span>
+                            ),
+                          },
+                          ...people.map((m) => ({ value: m.id, label: m.name, icon: <Avatar member={m} size={28} /> })),
+                        ]}
+                        trigger={
+                          people.find((m) => m.id === t.assignee) ? (
+                            <Avatar member={people.find((m) => m.id === t.assignee)!} size={28} />
+                          ) : (
+                            <span className="grid size-7 place-items-center rounded-full border border-dashed border-[#c4c7d6] text-[#b6b9c9]">
+                              <UserPlus size={14} />
+                            </span>
+                          )
+                        }
+                      />
                     )}
                     <button
                       onClick={() => remove(t.id)}
