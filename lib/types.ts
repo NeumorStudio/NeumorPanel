@@ -15,6 +15,24 @@ export type Task = {
 
 export type ThemeId = "blue" | "orange" | "green" | "purple" | "pink" | "teal";
 
+export type ProjectLink = {
+  id: string;
+  title: string;
+  url: string;
+  by: string; // id del miembro que lo añadió
+  at: string; // ISO
+};
+
+export type ActivityType = "project" | "task" | "link";
+
+export type Activity = {
+  id: string;
+  type: ActivityType;
+  text: string; // p. ej. «movió “Diseñar” a Hecho»
+  by: string; // id del miembro
+  at: string; // ISO
+};
+
 export type Project = {
   id: string;
   name: string;
@@ -23,6 +41,8 @@ export type Project = {
   theme: ThemeId;
   dueDate?: string;
   tasks: Task[];
+  links?: ProjectLink[];
+  activity?: Activity[]; // la más reciente primero
   createdAt: string;
 };
 

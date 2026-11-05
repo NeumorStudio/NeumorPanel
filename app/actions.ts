@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { mutateDB } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { THEME_LIST } from "@/lib/themes";
-import type { Project, TaskStatus, ThemeId } from "@/lib/types";
+import { STATUSES, type ActivityType, type Project, type TaskStatus, type ThemeId } from "@/lib/types";
 
 type ProjectInput = {
   name: string;
@@ -15,8 +15,19 @@ type ProjectInput = {
   dueDate?: string;
 };
 
+const MAX_ACTIVITY = 200;
+const statusLabel = (s: TaskStatus) => STATUSES.find((x) => x.id === s)?.label ?? s;
+
+/** Añade una entrada al historial del proyecto (la más reciente primero). */
+function log(p: Project, by: string, type: ActivityType, text: string) {
+  p.activity = [
+    { id: crypto.randomUUID(), type, text, by, at: new Date().toISOString() },
+    ...(p.activity ?? []),
+  ].slice(0, MAX_ACTIVITY);
+}
+
 export async function createProject(input: ProjectInput) {
-  await requireUser();
+  const me = await requireUser();
   const name = input.name.trim();
   if (!name) return;
   const id = crypto.randomUUID();
@@ -31,6 +42,7 @@ export async function createProject(input: ProjectInput) {
       tasks: [],
       createdAt: new Date().toISOString(),
     };
+    log(project, me.id, "project", "creó el proyecto");
     db.projects.unshift(project);
   });
   revalidatePath("/");
@@ -38,17 +50,24 @@ export async function createProject(input: ProjectInput) {
 }
 
 export async function updateProject(id: string, input: ProjectInput) {
-  await requireUser();
+  const me = await requireUser();
   const name = input.name.trim();
   if (!name) return;
   await mutateDB((db) => {
     const p = db.projects.find((x) => x.id === id);
     if (!p) return;
+    const changes: string[] = [];
+    if (p.name !== name) changes.push(`renombró el proyecto a «${name}»`);
+    if ((p.dueDate ?? "") !== (input.dueDate ?? "")) {
+      changes.push(input.dueDate ? `cambió la fecha de entrega al ${input.dueDate}` : "quitó la fecha de entrega");
+    }
+    if (changes.length === 0) changes.push("editó el proyecto");
     p.name = name;
     p.category = input.category.trim();
     p.description = input.description.trim();
     p.theme = input.theme;
     p.dueDate = input.dueDate || undefined;
+    for (const c of changes) log(p, me.id, "project", c);
   });
   revalidatePath("/");
   revalidatePath(`/projects/${id}`);
@@ -63,38 +82,96 @@ export async function deleteProject(id: string) {
   redirect("/");
 }
 
-// Las acciones de tareas no revalidan: la interfaz ya trabaja en optimista.
+// En las tareas la interfaz ya es optimista; se revalida solo para que
+// la pestaña Actividad se actualice.
 
 export async function addTask(
   projectId: string,
   task: { id: string; title: string; status: TaskStatus; dueDate?: string },
 ) {
-  await requireUser();
+  const me = await requireUser();
+  const title = task.title.trim();
+  if (!title) return;
   await mutateDB((db) => {
-    db.projects.find((p) => p.id === projectId)?.tasks.push(task);
+    const p = db.projects.find((x) => x.id === projectId);
+    if (!p) return;
+    p.tasks.push({ ...task, title });
+    log(p, me.id, "task", `creó la tarea «${title}»`);
   });
+  revalidatePath(`/projects/${projectId}`);
 }
 
-export async function setTaskStatus(
-  projectId: string,
-  taskId: string,
-  status: TaskStatus,
-) {
-  await requireUser();
+export async function setTaskStatus(projectId: string, taskId: string, status: TaskStatus) {
+  const me = await requireUser();
   await mutateDB((db) => {
-    const t = db.projects
-      .find((p) => p.id === projectId)
-      ?.tasks.find((x) => x.id === taskId);
-    if (t) t.status = status;
+    const p = db.projects.find((x) => x.id === projectId);
+    const t = p?.tasks.find((x) => x.id === taskId);
+    if (!p || !t || t.status === status) return;
+    t.status = status;
+    log(
+      p,
+      me.id,
+      "task",
+      status === "done" ? `completó «${t.title}»` : `movió «${t.title}» a ${statusLabel(status)}`,
+    );
   });
+  revalidatePath(`/projects/${projectId}`);
 }
 
 export async function deleteTask(projectId: string, taskId: string) {
-  await requireUser();
+  const me = await requireUser();
   await mutateDB((db) => {
     const p = db.projects.find((x) => x.id === projectId);
-    if (p) p.tasks = p.tasks.filter((t) => t.id !== taskId);
+    const t = p?.tasks.find((x) => x.id === taskId);
+    if (!p || !t) return;
+    p.tasks = p.tasks.filter((x) => x.id !== taskId);
+    log(p, me.id, "task", `eliminó la tarea «${t.title}»`);
   });
+  revalidatePath(`/projects/${projectId}`);
+}
+
+/** Acepta "figma.com/x" o "https://…". Solo http(s). */
+function normalizeUrl(raw: string): string | null {
+  const value = raw.trim();
+  if (!value) return null;
+  try {
+    const url = new URL(/^[a-z][a-z\d+.-]*:/i.test(value) ? value : `https://${value}`);
+    return url.protocol === "http:" || url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function addLink(projectId: string, title: string, rawUrl: string): Promise<{ error?: string }> {
+  const me = await requireUser();
+  const url = normalizeUrl(rawUrl);
+  if (!url) return { error: "Escribe un enlace válido (por ejemplo https://figma.com/…)." };
+  const name = title.trim() || new URL(url).hostname.replace(/^www\./, "");
+  const found = await mutateDB((db) => {
+    const p = db.projects.find((x) => x.id === projectId);
+    if (!p) return false;
+    p.links = [
+      ...(p.links ?? []),
+      { id: crypto.randomUUID(), title: name.slice(0, 120), url, by: me.id, at: new Date().toISOString() },
+    ];
+    log(p, me.id, "link", `añadió el enlace «${name.slice(0, 120)}»`);
+    return true;
+  });
+  if (!found) return { error: "No se encontró el proyecto." };
+  revalidatePath(`/projects/${projectId}`);
+  return {};
+}
+
+export async function deleteLink(projectId: string, linkId: string) {
+  const me = await requireUser();
+  await mutateDB((db) => {
+    const p = db.projects.find((x) => x.id === projectId);
+    const l = p?.links?.find((x) => x.id === linkId);
+    if (!p || !l) return;
+    p.links = p.links?.filter((x) => x.id !== linkId);
+    log(p, me.id, "link", `eliminó el enlace «${l.title}»`);
+  });
+  revalidatePath(`/projects/${projectId}`);
 }
 
 export async function saveMembers(members: { id: string; name: string; theme: ThemeId }[]) {

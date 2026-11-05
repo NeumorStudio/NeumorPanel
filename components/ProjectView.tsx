@@ -7,9 +7,17 @@ import Cover from "./Cover";
 import ProgressBar from "./ProgressBar";
 import ProjectDialog from "./ProjectDialog";
 import Avatar from "./Avatar";
+import FilesTab from "./FilesTab";
+import ActivityTab from "./ActivityTab";
 import { STATUSES, progressOf, type Member, type Project, type Task, type TaskStatus } from "@/lib/types";
 import { THEMES } from "@/lib/themes";
 import { addTask, deleteProject, deleteTask, setTaskStatus } from "@/app/actions";
+
+const TABS = [
+  { id: "tasks", label: "Tareas" },
+  { id: "files", label: "Archivos" },
+  { id: "activity", label: "Actividad" },
+] as const;
 
 function fmt(date?: string) {
   if (!date) return "";
@@ -20,6 +28,7 @@ export default function ProjectView({ project, members }: { project: Project; me
   const [tasks, setTasks] = useState<Task[]>(project.tasks);
   const [menu, setMenu] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [tab, setTab] = useState<"tasks" | "files" | "activity">("tasks");
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<TaskStatus | null>(null);
   const [, start] = useTransition();
@@ -120,15 +129,28 @@ export default function ProjectView({ project, members }: { project: Project; me
         </aside>
       </section>
 
-      <div className="mt-10 mb-4 border-b border-line">
-        <span
-          className="inline-block border-b-2 px-1 pb-3 font-medium"
-          style={{ borderColor: accent }}
-        >
-          Tareas
-        </span>
+      <div className="mt-10 mb-4 flex gap-6 border-b border-line">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`-mb-px border-b-2 px-1 pb-3 transition-colors ${
+              tab === t.id ? "font-medium" : "border-transparent text-muted hover:text-foreground"
+            }`}
+            style={tab === t.id ? { borderColor: accent } : undefined}
+          >
+            {t.label}
+            {t.id === "files" && (project.links?.length ?? 0) > 0 && (
+              <span className="ml-2 rounded-full bg-[#e8eaf3] px-1.5 py-0.5 text-xs">{project.links?.length}</span>
+            )}
+          </button>
+        ))}
       </div>
 
+      {tab === "files" && <FilesTab project={project} members={members} />}
+      {tab === "activity" && <ActivityTab project={project} members={members} />}
+
+      {tab === "tasks" && (
       <div className="grid gap-4 md:grid-cols-3">
         {STATUSES.map((col) => {
           const colTasks = tasks.filter((t) => t.status === col.id);
@@ -196,6 +218,7 @@ export default function ProjectView({ project, members }: { project: Project; me
           );
         })}
       </div>
+      )}
 
       {editing && <ProjectDialog project={project} onClose={() => setEditing(false)} />}
     </div>
