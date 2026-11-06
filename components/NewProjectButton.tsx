@@ -5,7 +5,13 @@ import { Plus } from "lucide-react";
 import ProjectDialog from "./ProjectDialog";
 import type { Member } from "@/lib/types";
 
-export default function NewProjectButton({ members }: { members: Member[] }) {
+export default function NewProjectButton({
+  members,
+  kind,
+}: {
+  members: Member[];
+  kind?: "client" | "lab";
+}) {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -16,7 +22,7 @@ export default function NewProjectButton({ members }: { members: Member[] }) {
         <Plus size={20} />
         <span className="hidden sm:inline">Nuevo proyecto</span>
       </button>
-      {open && <ProjectDialog members={members} onClose={() => setOpen(false)} />}
+      {open && <ProjectDialog members={members} kind={kind} onClose={() => setOpen(false)} />}
     </>
   );
 }

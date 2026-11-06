@@ -26,7 +26,15 @@ function fmt(date?: string) {
   return new Date(date + "T00:00:00").toLocaleDateString("es-ES", { day: "numeric", month: "short" });
 }
 
-export default function ProjectView({ project, members }: { project: Project; members: Member[] }) {
+export default function ProjectView({
+  project,
+  members,
+  backHref = "/",
+}: {
+  project: Project;
+  members: Member[];
+  backHref?: string;
+}) {
   const [tasks, setTasks] = useState<Task[]>(project.tasks);
   const [menu, setMenu] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -88,7 +96,7 @@ export default function ProjectView({ project, members }: { project: Project; me
     <div>
       <div className="flex items-center justify-between mb-6">
         <Link
-          href="/"
+          href={backHref}
           className="grid size-11 place-items-center rounded-full bg-[#eef0f6] text-muted hover:bg-[#e3e5ef]"
           aria-label="Volver"
         >

@@ -16,10 +16,12 @@ const INPUT =
 export default function ProjectDialog({
   project,
   members,
+  kind,
   onClose,
 }: {
   project?: Project;
   members: Member[];
+  kind?: "client" | "lab";
   onClose: () => void;
 }) {
   const [name, setName] = useState(project?.name ?? "");
@@ -45,7 +47,7 @@ export default function ProjectDialog({
     e.preventDefault();
     if (!name.trim()) return;
     start(async () => {
-      const input = { name, category, description, theme, dueDate, areas: normalizeAreas([...areas, areaDraft]), members: people };
+      const input = { name, category, description, theme, dueDate, areas: normalizeAreas([...areas, areaDraft]), members: people, kind };
       if (project) {
         await updateProject(project.id, input);
         onClose();

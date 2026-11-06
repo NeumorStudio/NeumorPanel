@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/session";
 import { THEME_LIST, normalizeTheme } from "@/lib/themes";
 import { normalizeAreas } from "@/lib/areas";
 import { participantsOf } from "@/lib/participants";
+import { projectPath, sectionPath } from "@/lib/paths";
 import { STATUSES, type ActivityType, type Project, type TaskStatus, type ThemeId } from "@/lib/types";
 
 type ProjectInput = {
@@ -17,7 +18,14 @@ type ProjectInput = {
   dueDate?: string;
   areas?: string[];
   members?: string[];
+  kind?: "client" | "lab"; // solo se usa al crear
 };
+
+/** Un proyecto vive en /projects/[id] (clientes) o en /lab/[id]: se refrescan ambas. */
+function revalidateProject(id: string) {
+  revalidatePath(`/projects/${id}`);
+  revalidatePath(`/lab/${id}`);
+}
 
 const MAX_ACTIVITY = 200;
 
@@ -47,6 +55,7 @@ export async function createProject(input: ProjectInput) {
       name,
       category: input.category.trim(),
       description: input.description.trim(),
+      kind: input.kind === "lab" ? "lab" : undefined,
       theme: normalizeTheme(input.theme),
       dueDate: input.dueDate || undefined,
       areas: normalizeAreas(input.areas),
@@ -58,7 +67,8 @@ export async function createProject(input: ProjectInput) {
     db.projects.unshift(project);
   });
   revalidatePath("/");
-  redirect(`/projects/${id}`);
+  revalidatePath("/lab");
+  redirect(projectPath({ id, kind: input.kind === "lab" ? "lab" : undefined }));
 }
 
 export async function updateProject(id: string, input: ProjectInput) {
@@ -97,16 +107,21 @@ export async function updateProject(id: string, input: ProjectInput) {
     for (const c of changes) log(p, me.id, "project", c);
   });
   revalidatePath("/");
+  revalidatePath("/lab");
   revalidatePath(`/projects/${id}`);
+  revalidatePath(`/lab/${id}`);
 }
 
 export async function deleteProject(id: string) {
   await requireUser();
-  await mutateDB((db) => {
+  const kind = await mutateDB((db) => {
+    const k = db.projects.find((p) => p.id === id)?.kind;
     db.projects = db.projects.filter((p) => p.id !== id);
+    return k;
   });
   revalidatePath("/");
-  redirect("/");
+  revalidatePath("/lab");
+  redirect(sectionPath(kind));
 }
 
 // En las tareas la interfaz ya es optimista; se revalida solo para que
@@ -127,7 +142,7 @@ export async function addTask(
     p.tasks.push({ ...task, title, area, assignee });
     log(p, me.id, "task", `creó la tarea «${title}»`);
   });
-  revalidatePath(`/projects/${projectId}`);
+  revalidateProject(projectId);
 }
 
 export async function setTaskStatus(projectId: string, taskId: string, status: TaskStatus) {
@@ -144,7 +159,7 @@ export async function setTaskStatus(projectId: string, taskId: string, status: T
       status === "done" ? `completó «${t.title}»` : `movió «${t.title}» a ${statusLabel(status)}`,
     );
   });
-  revalidatePath(`/projects/${projectId}`);
+  revalidateProject(projectId);
 }
 
 export async function setTaskArea(projectId: string, taskId: string, area: string | null) {
@@ -156,7 +171,7 @@ export async function setTaskArea(projectId: string, taskId: string, area: strin
     if (area && p.areas?.includes(area)) t.area = area;
     else delete t.area;
   });
-  revalidatePath(`/projects/${projectId}`);
+  revalidateProject(projectId);
 }
 
 export async function setTaskAssignee(projectId: string, taskId: string, assignee: string | null) {
@@ -174,7 +189,7 @@ export async function setTaskAssignee(projectId: string, taskId: string, assigne
       log(p, me.id, "task", `quitó el responsable de «${t.title}»`);
     }
   });
-  revalidatePath(`/projects/${projectId}`);
+  revalidateProject(projectId);
 }
 
 export async function updateTask(
@@ -200,7 +215,7 @@ export async function updateTask(
       log(p, me.id, "task", dueDate ? `cambió la fecha de «${title}» al ${dueDate}` : `quitó la fecha de «${title}»`);
     }
   });
-  revalidatePath(`/projects/${projectId}`);
+  revalidateProject(projectId);
 }
 
 export async function deleteTask(projectId: string, taskId: string) {
@@ -212,7 +227,7 @@ export async function deleteTask(projectId: string, taskId: string) {
     p.tasks = p.tasks.filter((x) => x.id !== taskId);
     log(p, me.id, "task", `eliminó la tarea «${t.title}»`);
   });
-  revalidatePath(`/projects/${projectId}`);
+  revalidateProject(projectId);
 }
 
 /** Acepta "figma.com/x" o "https://…". Solo http(s). */
@@ -243,7 +258,7 @@ export async function addLink(projectId: string, title: string, rawUrl: string):
     return true;
   });
   if (!found) return { error: "No se encontró el proyecto." };
-  revalidatePath(`/projects/${projectId}`);
+  revalidateProject(projectId);
   return {};
 }
 
@@ -256,7 +271,7 @@ export async function deleteLink(projectId: string, linkId: string) {
     p.links = p.links?.filter((x) => x.id !== linkId);
     log(p, me.id, "link", `eliminó el enlace «${l.title}»`);
   });
-  revalidatePath(`/projects/${projectId}`);
+  revalidateProject(projectId);
 }
 
 export async function saveMembers(members: { id: string; name: string; theme: ThemeId }[]) {

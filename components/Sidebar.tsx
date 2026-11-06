@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FolderKanban, Settings } from "lucide-react";
+import { FlaskConical, FolderKanban, Settings } from "lucide-react";
 
 const ITEMS = [
   { href: "/", label: "Proyectos", icon: FolderKanban },
+  { href: "/lab", label: "Lab", icon: FlaskConical },
   { href: "/settings", label: "Ajustes", icon: Settings },
 ];
 

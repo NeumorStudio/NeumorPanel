@@ -35,11 +35,15 @@ export type Activity = {
   at: string; // ISO
 };
 
+/** "lab" = proyectos de prueba propios; sin valor = proyecto de cliente. */
+export type ProjectKind = "client" | "lab";
+
 export type Project = {
   id: string;
   name: string;
   category: string;
   description: string;
+  kind?: ProjectKind;
   theme: string; // preset ("blue") o color personalizado ("#8a3ffc")
   dueDate?: string;
   tasks: Task[];
