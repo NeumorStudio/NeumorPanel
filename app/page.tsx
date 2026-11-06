@@ -1,10 +1,8 @@
 import Link from "next/link";
 import { readDB } from "@/lib/db";
 import { requireUser } from "@/lib/session";
-import { progressOf } from "@/lib/types";
 import { getTheme } from "@/lib/themes";
 import Cover from "@/components/Cover";
-import ProgressBar from "@/components/ProgressBar";
 import NewProjectButton from "@/components/NewProjectButton";
 import PendingPill from "@/components/PendingPill";
 
@@ -52,9 +50,6 @@ export default async function Home() {
               <div className="p-5">
                 <h2 className="text-xl font-semibold">{p.name}</h2>
                 <p className="mt-0.5 text-muted min-h-6">{p.category}</p>
-                <div className="mt-4">
-                  <ProgressBar value={progressOf(p.tasks)} theme={p.theme} />
-                </div>
               </div>
             </Link>
             );

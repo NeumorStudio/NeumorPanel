@@ -4,13 +4,12 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { ArrowLeft, CalendarDays, UserPlus, Check, MoreHorizontal, Pencil, Plus, Trash2, Users, X } from "lucide-react";
 import Cover from "./Cover";
-import ProgressBar from "./ProgressBar";
 import ProjectDialog from "./ProjectDialog";
 import Avatar from "./Avatar";
 import FilesTab from "./FilesTab";
 import ActivityTab from "./ActivityTab";
 import OptionMenu from "./OptionMenu";
-import { STATUSES, progressOf, type Member, type Project, type Task, type TaskStatus } from "@/lib/types";
+import { STATUSES, type Member, type Project, type Task, type TaskStatus } from "@/lib/types";
 import { getTheme } from "@/lib/themes";
 import { areaColor } from "@/lib/areas";
 import { participantsOf } from "@/lib/participants";
@@ -133,9 +132,6 @@ export default function ProjectView({ project, members }: { project: Project; me
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight break-words">{project.name}</h1>
           {project.category && <p className="mt-1 text-xl text-muted">{project.category}</p>}
           {project.description && <p className="mt-2 text-muted">{project.description}</p>}
-          <div className="mt-4 max-w-md">
-            <ProgressBar value={progressOf(tasks)} theme={project.theme} />
-          </div>
         </div>
         <aside className="rounded-3xl bg-[#eff0f6] p-5 lg:w-64 flex flex-row flex-wrap sm:flex-col justify-between sm:justify-center gap-4">
           <div className="flex items-start gap-3">

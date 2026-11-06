@@ -62,10 +62,3 @@ export type DB = {
   members: Member[];
   projects: Project[];
 };
-
-export function progressOf(tasks: Task[]): number {
-  if (tasks.length === 0) return 0;
-  return Math.round(
-    (tasks.filter((t) => t.status === "done").length / tasks.length) * 100,
-  );
-}
