@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import ThemeToggle from "./ThemeToggle";
-import { FlaskConical, FolderKanban, Settings } from "lucide-react";
+import { FlaskConical, FolderKanban, KeyRound, Settings } from "lucide-react";
 
-const ITEMS = [
+const ITEMS: { href: string; label: string; short?: string; icon: typeof Settings }[] = [
   { href: "/", label: "Proyectos", icon: FolderKanban },
   { href: "/lab", label: "Lab", icon: FlaskConical },
+  { href: "/credenciales", label: "Credenciales", short: "Claves", icon: KeyRound },
   { href: "/settings", label: "Ajustes", icon: Settings },
 ];
 
@@ -49,14 +50,14 @@ export default function Sidebar() {
       />
     </aside>
     <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden">
-      {ITEMS.map(({ href, label, icon: Icon }) => (
+      {ITEMS.map(({ href, label, short, icon: Icon }) => (
         <Link
           key={href}
           href={href}
           className={`flex flex-1 flex-col items-center gap-1 py-2.5 text-xs ${isActive(href) ? "font-medium text-primary" : "text-muted"}`}
         >
           <Icon size={22} strokeWidth={1.8} />
-          {label}
+          {short ?? label}
         </Link>
       ))}
       <ThemeToggle className="flex flex-1 flex-col items-center gap-1 py-2.5 text-xs text-muted" />

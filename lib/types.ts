@@ -62,7 +62,25 @@ export type Member = {
   avatar?: string; // foto de GitHub
 };
 
+/** Credencial cifrada: todo lo sensible va dentro de `blob` (AES-256-GCM). */
+export type VaultItem = {
+  id: string;
+  projectId?: string;
+  blob: string;
+  by: string;
+  at: string;
+};
+
+export type Vault = {
+  salt: string; // base64, para derivar la clave desde la contraseña maestra
+  check: string; // blob cifrado de comprobación: sirve para validar la contraseña
+  items: VaultItem[];
+  fails?: number;
+  lockUntil?: number;
+};
+
 export type DB = {
   members: Member[];
   projects: Project[];
+  vault?: Vault;
 };
