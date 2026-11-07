@@ -110,3 +110,50 @@ export async function deleteCredential(id: string): Promise<Result> {
   revalidatePath(PATH);
   return {};
 }
+
+/** Importa en bloque (p. ej. el CSV de Google). Se saltan las que ya existen. */
+export async function importCredentials(
+  rows: { service: string; username: string; password: string; url: string; notes: string }[],
+  projectId?: string,
+): Promise<Result & { added?: number; skipped?: number }> {
+  const me = await requireUser();
+  const key = await unlockedKey(me.id);
+  if (!key) return { error: "Sesión bloqueada. Vuelve a introducir la contraseña." };
+  if (!Array.isArray(rows) || rows.length === 0) return { error: "No hay nada que importar." };
+  if (rows.length > 3000) return { error: "Demasiadas filas (máximo 3000)." };
+
+  const clean: Secret[] = rows.flatMap((r) => {
+    const s: Secret = {
+      service: str(r?.service, 80),
+      username: str(r?.username, 200),
+      password: typeof r?.password === "string" ? r.password.slice(0, 500) : "",
+      url: str(r?.url, 300),
+      notes: typeof r?.notes === "string" ? r.notes.trim().slice(0, 2000) : "",
+    };
+    return s.service ? [s] : [];
+  });
+
+  const res = await mutateDB((db) => {
+    const v = db.vault;
+    if (!v) return null;
+    const pid = db.projects.some((p) => p.id === projectId) ? projectId : undefined;
+    const sig = (s: Secret) => `${s.service}\n${s.username}\n${s.url}`.toLowerCase();
+    const seen = new Set<string>();
+    for (const i of v.items) {
+      const s = decrypt<Secret>(key, i.blob);
+      if (s) seen.add(sig(s));
+    }
+    let added = 0;
+    const at = new Date().toISOString();
+    for (const s of clean) {
+      if (seen.has(sig(s))) continue;
+      seen.add(sig(s));
+      v.items.push({ id: crypto.randomUUID(), projectId: pid, blob: encrypt(key, s), by: me.id, at });
+      added++;
+    }
+    return { added, skipped: clean.length - added };
+  });
+  if (!res) return { error: "No hay contraseña creada." };
+  revalidatePath(PATH);
+  return res;
+}
