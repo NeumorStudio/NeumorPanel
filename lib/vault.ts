@@ -9,7 +9,7 @@ import { cookies } from "next/headers";
 export const COOKIE = "np_vault";
 export const UNLOCK_MINUTES = 30;
 
-export type Secret = { service: string; username: string; password: string; url: string; notes: string };
+export type Secret = { service: string; username: string; password: string; url: string; notes: string; icon?: string };
 
 export function deriveKey(password: string, salt: Buffer): Promise<Buffer> {
   return new Promise((resolve, reject) =>

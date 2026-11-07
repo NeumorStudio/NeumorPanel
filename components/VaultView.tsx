@@ -13,6 +13,7 @@ export type Credential = {
   password: string;
   url: string;
   notes: string;
+  icon?: string;
 };
 type Proj = { id: string; name: string };
 
@@ -23,6 +24,54 @@ function generate() {
   const chars = "abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%&*-_";
   const buf = crypto.getRandomValues(new Uint32Array(20));
   return Array.from(buf, (n) => chars[n % chars.length]).join("");
+}
+
+function hostOf(url: string) {
+  try {
+    return new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`).hostname;
+  } catch {
+    return "";
+  }
+}
+
+/** Logo propio; si no hay, el favicon de la web; si tampoco, la llavecita. */
+function Logo({ icon, url, service = "", size = 44 }: { icon?: string; url: string; service?: string; size?: number }) {
+  // Sin URL, si el nombre del servicio parece un dominio (p. ej. «github.com») se usa ese.
+  const host = url ? hostOf(url) : /^[\w-]+(\.[\w-]+)+$/.test(service.trim()) ? service.trim().toLowerCase() : "";
+  const src = icon || (host.includes(".") ? `https://www.google.com/s2/favicons?domain=${encodeURIComponent(host)}&sz=64` : "");
+  const [failed, setFailed] = useState<string | null>(null);
+  const box = { width: size, height: size };
+  if (src && failed !== src) {
+    return (
+      <span className="grid shrink-0 place-items-center overflow-hidden rounded-xl bg-white" style={box}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src}
+          alt=""
+          width={size}
+          height={size}
+          className="size-full object-contain p-1"
+          onError={() => setFailed(src)}
+        />
+      </span>
+    );
+  }
+  return (
+    <span className="grid shrink-0 place-items-center rounded-xl bg-accsoft text-accink" style={box}>
+      <KeyRound size={size * 0.45} />
+    </span>
+  );
+}
+
+/** Reduce la imagen a 128 px para que ocupe poco. */
+async function shrink(file: File): Promise<string> {
+  const bmp = await createImageBitmap(file);
+  const k = Math.min(1, 128 / Math.max(bmp.width, bmp.height));
+  const c = document.createElement("canvas");
+  c.width = Math.max(1, Math.round(bmp.width * k));
+  c.height = Math.max(1, Math.round(bmp.height * k));
+  c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
+  return c.toDataURL("image/png");
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -52,9 +101,7 @@ function Card({ c, project, onEdit }: { c: Credential; project?: Proj; onEdit: (
   return (
     <div className="flex flex-col gap-2 rounded-3xl bg-surface p-5 shadow-card">
       <div className="flex items-center gap-3">
-        <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-accsoft text-accink">
-          <KeyRound size={20} />
-        </span>
+        <Logo icon={c.icon} url={c.url} service={c.service} />
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold">{c.service}</p>
           {project && <p className="truncate text-xs text-muted">{project.name}</p>}
@@ -118,6 +165,7 @@ function CredentialDialog({
     password: initial?.password ?? "",
     url: initial?.url ?? "",
     notes: initial?.notes ?? "",
+    icon: initial?.icon ?? "",
     projectId: initial?.projectId ?? "",
   });
   const [showPw, setShowPw] = useState(false);
@@ -129,7 +177,7 @@ function CredentialDialog({
   function submit(e: React.FormEvent) {
     e.preventDefault();
     start(async () => {
-      const r = await saveCredential(initial?.id ?? null, { ...f, projectId: f.projectId || undefined });
+      const r = await saveCredential(initial?.id ?? null, { ...f, icon: f.icon || undefined, projectId: f.projectId || undefined });
       if (r.error) setError(r.error);
       else onClose();
     });
@@ -146,6 +194,35 @@ function CredentialDialog({
           <button type="button" onClick={onClose} aria-label="Cerrar" className="grid size-8 place-items-center rounded-full text-muted hover:bg-soft">
             <X size={18} />
           </button>
+        </div>
+        <div className="flex items-center gap-3">
+          <Logo icon={f.icon} url={f.url} service={f.service} size={52} />
+          <label className="cursor-pointer rounded-xl bg-soft px-3.5 py-2 text-sm text-muted hover:bg-soft2">
+            {f.icon ? "Cambiar logo" : "Subir logo"}
+            <input
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
+                try {
+                  const icon = await shrink(file);
+                  setF((cur) => ({ ...cur, icon }));
+                  setError("");
+                } catch {
+                  setError("No he podido leer esa imagen.");
+                }
+              }}
+            />
+          </label>
+          {f.icon && (
+            <button type="button" onClick={() => setF({ ...f, icon: "" })} className="text-sm text-muted hover:text-red-500">
+              Quitar
+            </button>
+          )}
+          {!f.icon && <span className="text-xs text-muted">Si lo dejas vacío, uso el icono de la web.</span>}
         </div>
         <input autoFocus className={INPUT} placeholder="Servicio (p. ej. Vercel, IONOS…)" value={f.service} onChange={set("service")} />
         <input className={INPUT} placeholder="Usuario o email" autoComplete="off" value={f.username} onChange={set("username")} />

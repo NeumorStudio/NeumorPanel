@@ -10,6 +10,11 @@ type Result = { error?: string };
 const PATH = "/credenciales";
 const MAX_FAILS = 5;
 const LOCK_MS = 60_000;
+/** Logo subido por el usuario: imagen pequeña en data URL (png/jpeg/webp). */
+const validIcon = (v: unknown) =>
+  typeof v === "string" && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(v) && v.length < 80_000
+    ? v
+    : undefined;
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
 /** Primera vez: crea la contraseña maestra del equipo. */
@@ -69,7 +74,7 @@ export async function lockVault() {
 
 export async function saveCredential(
   id: string | null,
-  input: { service: string; username: string; password: string; url: string; notes: string; projectId?: string },
+  input: { service: string; username: string; password: string; url: string; notes: string; icon?: string; projectId?: string },
 ): Promise<Result> {
   const me = await requireUser();
   const key = await unlockedKey(me.id);
@@ -80,6 +85,7 @@ export async function saveCredential(
     password: typeof input.password === "string" ? input.password.slice(0, 500) : "",
     url: str(input.url, 300),
     notes: typeof input.notes === "string" ? input.notes.trim().slice(0, 2000) : "",
+    icon: validIcon(input.icon),
   };
   if (!secret.service) return { error: "Pon el nombre del servicio." };
   const blob = encrypt(key, secret);
