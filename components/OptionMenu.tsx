@@ -44,7 +44,7 @@ export default function OptionMenu({
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} />
           <div
             role="menu"
-            className={`absolute top-full z-40 mt-1.5 min-w-48 rounded-2xl bg-white p-1.5 shadow-card-hover ${
+            className={`absolute top-full z-40 mt-1.5 min-w-48 rounded-2xl bg-surface p-1.5 shadow-card-hover ${
               align === "right" ? "right-0" : "left-0"
             }`}
           >
@@ -57,7 +57,7 @@ export default function OptionMenu({
                   setOpen(false);
                   if (o.value !== selected) onSelect(o.value);
                 }}
-                className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm hover:bg-[#f3f4f9]"
+                className="flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2 text-left text-sm hover:bg-hov"
               >
                 <span className="grid size-7 shrink-0 place-items-center">{o.icon}</span>
                 <span className="min-w-0 flex-1 truncate">{o.label}</span>

@@ -14,7 +14,7 @@ export default function ActivityTab({ project, members }: { project: Project; me
 
   if (items.length === 0) {
     return (
-      <div className="rounded-3xl border border-dashed border-[#d8dae6] bg-white/60 py-14 text-center">
+      <div className="rounded-3xl border border-dashed border-edge bg-surface/60 py-14 text-center">
         <p className="font-semibold">Todavía no hay actividad</p>
         <p className="mt-1 text-muted">Aquí aparecerá cada cambio: tareas, enlaces y ajustes del proyecto.</p>
       </div>
@@ -27,11 +27,11 @@ export default function ActivityTab({ project, members }: { project: Project; me
         const who = members.find((m) => m.id === a.by);
         const Icon = ICONS[a.type] ?? ListChecks;
         return (
-          <li key={a.id} className="flex items-start gap-3 rounded-2xl px-2 py-3 hover:bg-white/70">
+          <li key={a.id} className="flex items-start gap-3 rounded-2xl px-2 py-3 hover:bg-surface/70">
             {who ? (
               <Avatar member={who} size={34} />
             ) : (
-              <span className="grid size-[34px] shrink-0 place-items-center rounded-full bg-[#e3e5ef] text-sm text-muted">
+              <span className="grid size-[34px] shrink-0 place-items-center rounded-full bg-soft3 text-sm text-muted">
                 ?
               </span>
             )}

@@ -21,7 +21,7 @@ export default function ProjectGrid({
 
   if (projects.length === 0) {
     return (
-      <div className="rounded-3xl border border-dashed border-[#d8dae6] bg-white/60 py-24 text-center">
+      <div className="rounded-3xl border border-dashed border-edge bg-surface/60 py-24 text-center">
         <p className="text-xl font-semibold">{emptyTitle}</p>
         <p className="mt-1 text-muted">{emptyHint}</p>
       </div>
@@ -44,7 +44,7 @@ export default function ProjectGrid({
           <Link
             key={p.id}
             href={href}
-            className="group overflow-hidden rounded-3xl bg-white shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
+            className="group overflow-hidden rounded-3xl bg-surface shadow-card transition duration-200 hover:-translate-y-0.5 hover:shadow-card-hover"
           >
             <Cover theme={p.theme} className="h-44">
               {pending.length > 0 && (

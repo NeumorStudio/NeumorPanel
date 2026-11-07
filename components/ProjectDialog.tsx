@@ -11,7 +11,7 @@ import type { Member, Project } from "@/lib/types";
 import { createProject, updateProject } from "@/app/actions";
 
 const INPUT =
-  "w-full rounded-xl border border-line bg-[#fafbfd] px-3.5 py-2.5 text-base sm:text-[15px] outline-none focus:border-primary focus:bg-white focus:ring-4 focus:ring-primary/10";
+  "w-full rounded-xl border border-line bg-field px-3.5 py-2.5 text-base sm:text-[15px] outline-none focus:border-primary focus:bg-surface focus:ring-4 focus:ring-primary/10";
 
 export default function ProjectDialog({
   project,
@@ -64,7 +64,7 @@ export default function ProjectDialog({
     >
       <form
         onSubmit={submit}
-        className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl flex flex-col gap-4"
+        className="w-full max-w-md rounded-3xl bg-surface p-6 shadow-2xl flex flex-col gap-4"
       >
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-semibold">
@@ -73,7 +73,7 @@ export default function ProjectDialog({
           <button
             type="button"
             onClick={onClose}
-            className="grid size-8 place-items-center rounded-full text-muted hover:bg-[#f1f2f7]"
+            className="grid size-8 place-items-center rounded-full text-muted hover:bg-soft"
             aria-label="Cerrar"
           >
             <X size={18} />
@@ -122,7 +122,7 @@ export default function ProjectDialog({
                   onClick={() => setPeople(on ? people.filter((x) => x !== m.id) : [...people, m.id])}
                   aria-pressed={on}
                   className={`flex items-center gap-2 rounded-full py-1 pl-1 pr-3 text-sm transition ${
-                    on ? "bg-[#e6ecff] font-medium text-[#2f4fb8] ring-1 ring-primary/40" : "bg-[#f1f2f7] text-muted"
+                    on ? "bg-accsoft font-medium text-accink ring-1 ring-primary/40" : "bg-soft text-muted"
                   }`}
                 >
                   <span className={on ? "" : "opacity-50 grayscale"}>
@@ -170,7 +170,7 @@ export default function ProjectDialog({
                 }}
                 onBlur={() => areaDraft.trim() && addArea()}
                 placeholder={areas.length ? "Otra parte…" : "Ej. Web, App cliente, App admin ⏎"}
-                className="min-w-0 flex-1 basis-40 rounded-full border border-dashed border-[#cfd2e0] bg-transparent px-3 py-1 text-base outline-none focus:border-primary sm:text-sm"
+                className="min-w-0 flex-1 basis-40 rounded-full border border-dashed border-edge bg-transparent px-3 py-1 text-base outline-none focus:border-primary sm:text-sm"
               />
             )}
           </div>
@@ -190,7 +190,7 @@ export default function ProjectDialog({
                 className="relative size-9 rounded-full ring-offset-2 transition-transform hover:scale-110"
                 style={{
                   background: t.bg,
-                  boxShadow: theme === t.id ? `0 0 0 2px #fff, 0 0 0 4px ${t.accent}` : undefined,
+                  boxShadow: theme === t.id ? `0 0 0 2px var(--surface), 0 0 0 4px ${t.accent}` : undefined,
                 }}
               >
                 {theme === t.id && (
@@ -208,13 +208,13 @@ export default function ProjectDialog({
                 if (!wheelOpen && !isHex(theme)) setTheme(getTheme(theme).accent);
                 setWheelOpen((o) => !o);
               }}
-              className="relative grid size-9 place-items-center rounded-full border-2 border-dashed border-[#c4c7d6] text-muted transition-transform hover:scale-110"
+              className="relative grid size-9 place-items-center rounded-full border-2 border-dashed border-edge text-muted transition-transform hover:scale-110"
               style={
                 isHex(theme)
                   ? {
                       background: getTheme(theme).bg,
                       border: "none",
-                      boxShadow: `0 0 0 2px #fff, 0 0 0 4px ${getTheme(theme).accent}`,
+                      boxShadow: `0 0 0 2px var(--surface), 0 0 0 4px ${getTheme(theme).accent}`,
                     }
                   : undefined
               }
@@ -227,7 +227,7 @@ export default function ProjectDialog({
             </button>
           </div>
           {wheelOpen && (
-            <div className="mt-3 rounded-2xl bg-[#f6f7fb] p-4">
+            <div className="mt-3 rounded-2xl bg-hov p-4">
               <ColorWheel value={isHex(theme) ? theme : THEMES.blue.accent} onChange={setTheme} />
             </div>
           )}

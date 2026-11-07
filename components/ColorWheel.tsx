@@ -97,7 +97,7 @@ export default function ColorWheel({ value, onChange }: { value: string; onChang
             max={100}
             value={Math.round(v * 100)}
             onChange={(e) => emit(h, s, Number(e.target.value) / 100)}
-            className="mt-1.5 block h-3 w-full cursor-pointer appearance-none rounded-full [&::-moz-range-thumb]:size-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-[3px] [&::-moz-range-thumb]:border-white [&::-webkit-slider-thumb]:size-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-[3px] [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-[#161821] [&::-webkit-slider-thumb]:shadow-md"
+            className="mt-1.5 block h-3 w-full cursor-pointer appearance-none rounded-full [&::-moz-range-thumb]:size-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-[3px] [&::-moz-range-thumb]:border-white [&::-webkit-slider-thumb]:size-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-[3px] [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:bg-ink [&::-webkit-slider-thumb]:shadow-md"
             style={{ background: `linear-gradient(90deg, #000, ${pureHex})` }}
           />
         </label>
@@ -118,7 +118,7 @@ export default function ColorWheel({ value, onChange }: { value: string; onChang
               onBlur={() => setHexText(hsvToHex(h, s, v))}
               spellCheck={false}
               maxLength={7}
-              className="w-full min-w-0 rounded-lg border border-line bg-white px-2.5 py-1.5 font-mono text-base uppercase text-foreground outline-none focus:border-primary sm:text-sm"
+              className="w-full min-w-0 rounded-lg border border-line bg-surface px-2.5 py-1.5 font-mono text-base uppercase text-foreground outline-none focus:border-primary sm:text-sm"
             />
           </div>
         </label>

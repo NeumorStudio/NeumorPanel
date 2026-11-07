@@ -1,11 +1,62 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light;
   --background: #f6f7fa;
   --foreground: #12131a;
   --muted: #6b6f85;
   --line: #e9eaf1;
   --primary: #2f6bff;
+  --surface: #ffffff;
+  --field: #fafbfd;
+  --soft: #f1f2f7;
+  --soft2: #e9eaf2;
+  --soft3: #e3e5ef;
+  --col: #eff0f6;
+  --colover: #e4e7f3;
+  --chip: #e8eaf3;
+  --chip2: #dcdfec;
+  --hov: #f3f4f9;
+  --edge: #d0d3e2;
+  --faint: #b6b9c9;
+  --accsoft: #e6ecff;
+  --accink: #2f4fb8;
+  --ink: #161821;
+  --onink: #ffffff;
+  --shadow-a: rgba(20, 24, 50, 0.04);
+  --shadow-b: rgba(20, 24, 50, 0.06);
+  --shadow-c: rgba(20, 24, 50, 0.05);
+  --shadow-d: rgba(20, 24, 50, 0.1);
+}
+
+/* Modo oscuro: azul pizarra, no negro puro */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --background: #171923;
+  --foreground: #e8eaf3;
+  --muted: #9a9fb8;
+  --line: #2a2e3f;
+  --primary: #5b8cff;
+  --surface: #202333;
+  --field: #1b1e2b;
+  --soft: #1d2030;
+  --soft2: #262a3b;
+  --soft3: #2e3246;
+  --col: #1d2030;
+  --colover: #272b3f;
+  --chip: #2a2e42;
+  --chip2: #343950;
+  --hov: #2a2e42;
+  --edge: #444963;
+  --faint: #6b7090;
+  --accsoft: #263459;
+  --accink: #a9c0ff;
+  --ink: #e8eaf3;
+  --onink: #171923;
+  --shadow-a: rgba(0, 0, 0, 0.18);
+  --shadow-b: rgba(0, 0, 0, 0.22);
+  --shadow-c: rgba(0, 0, 0, 0.2);
+  --shadow-d: rgba(0, 0, 0, 0.32);
 }
 
 @theme inline {
@@ -14,9 +65,25 @@
   --color-muted: var(--muted);
   --color-line: var(--line);
   --color-primary: var(--primary);
+  --color-surface: var(--surface);
+  --color-field: var(--field);
+  --color-soft: var(--soft);
+  --color-soft2: var(--soft2);
+  --color-soft3: var(--soft3);
+  --color-col: var(--col);
+  --color-colover: var(--colover);
+  --color-chip: var(--chip);
+  --color-chip2: var(--chip2);
+  --color-hov: var(--hov);
+  --color-edge: var(--edge);
+  --color-faint: var(--faint);
+  --color-accsoft: var(--accsoft);
+  --color-accink: var(--accink);
+  --color-ink: var(--ink);
+  --color-onink: var(--onink);
   --font-sans: var(--font-geist-sans);
-  --shadow-card: 0 1px 2px rgba(20, 24, 50, 0.04), 0 8px 24px rgba(20, 24, 50, 0.06);
-  --shadow-card-hover: 0 2px 4px rgba(20, 24, 50, 0.05), 0 16px 36px rgba(20, 24, 50, 0.1);
+  --shadow-card: 0 1px 2px var(--shadow-a), 0 8px 24px var(--shadow-b);
+  --shadow-card-hover: 0 2px 4px var(--shadow-c), 0 16px 36px var(--shadow-d);
 }
 
 body {

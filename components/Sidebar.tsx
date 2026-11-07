@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import ThemeToggle from "./ThemeToggle";
 import { FlaskConical, FolderKanban, Settings } from "lucide-react";
 
 const ITEMS = [
@@ -17,7 +18,7 @@ export default function Sidebar() {
 
   return (
     <>
-    <aside className="sticky top-0 hidden h-screen w-[220px] shrink-0 flex-col gap-8 border-r border-line bg-[#f1f2f7] px-3 py-6 sm:flex">
+    <aside className="sticky top-0 hidden h-screen w-[220px] shrink-0 flex-col gap-8 border-r border-line bg-soft px-3 py-6 sm:flex">
       <Link href="/" className="flex items-center gap-3 px-2" aria-label="NeumorPanel">
         <span className="grid grid-cols-2 gap-1 shrink-0">
           {[0, 1, 2, 3].map((i) => (
@@ -33,8 +34,8 @@ export default function Sidebar() {
             href={href}
             className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] transition-colors ${
               isActive(href)
-                ? "bg-[#e3e5ef] text-foreground font-medium"
-                : "text-muted hover:bg-[#e9eaf2]"
+                ? "bg-soft3 text-foreground font-medium"
+                : "text-muted hover:bg-soft2"
             }`}
           >
             <Icon size={20} strokeWidth={1.8} className="shrink-0" />
@@ -42,8 +43,12 @@ export default function Sidebar() {
           </Link>
         ))}
       </nav>
+      <ThemeToggle
+        label
+        className="mt-auto flex items-center gap-3 rounded-xl px-3 py-2.5 text-[15px] text-muted transition-colors hover:bg-soft2"
+      />
     </aside>
-    <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-white/90 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden">
+    <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur sm:hidden">
       {ITEMS.map(({ href, label, icon: Icon }) => (
         <Link
           key={href}
@@ -54,6 +59,7 @@ export default function Sidebar() {
           {label}
         </Link>
       ))}
+      <ThemeToggle className="flex flex-1 flex-col items-center gap-1 py-2.5 text-xs text-muted" />
     </nav>
     </>
   );

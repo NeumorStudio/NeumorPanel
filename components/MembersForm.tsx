@@ -48,7 +48,7 @@ export default function MembersForm({ initial, meId }: { initial: Member[]; meId
 
   return (
     <div className="flex max-w-xl flex-col gap-6">
-      <section className="rounded-3xl bg-white p-6 shadow-card">
+      <section className="rounded-3xl bg-surface p-6 shadow-card">
         <h2 className="text-xl font-semibold">Equipo</h2>
         <p className="mb-5 text-muted">Quién puede entrar, con su nombre y color.</p>
 
@@ -60,7 +60,7 @@ export default function MembersForm({ initial, meId }: { initial: Member[]; meId
                 <input
                   value={m.name}
                   onChange={(e) => update(m.id, { name: e.target.value })}
-                  className="w-full rounded-xl border border-line bg-[#fafbfd] px-3.5 py-2.5 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 sm:text-[15px]"
+                  className="w-full rounded-xl border border-line bg-field px-3.5 py-2.5 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 sm:text-[15px]"
                 />
                 <p className="mt-1 truncate pl-1 text-xs text-muted">
                   {m.github ? `@${m.github}` : "Sin cuenta de GitHub"}
@@ -82,7 +82,7 @@ export default function MembersForm({ initial, meId }: { initial: Member[]; meId
                 {m.id !== meId && (
                   <button
                     onClick={() => remove(m)}
-                    className="ml-1 p-1 text-[#b6b9c9] hover:text-red-500"
+                    className="ml-1 p-1 text-faint hover:text-red-500"
                     aria-label={`Quitar a ${m.name}`}
                   >
                     <Trash2 size={17} />
@@ -107,7 +107,7 @@ export default function MembersForm({ initial, meId }: { initial: Member[]; meId
         </button>
       </section>
 
-      <section className="rounded-3xl bg-white p-6 shadow-card">
+      <section className="rounded-3xl bg-surface p-6 shadow-card">
         <h2 className="text-xl font-semibold">Invitar con GitHub</h2>
         <p className="mb-4 text-muted">
           Escribe su usuario de GitHub. Podrá entrar con su cuenta y se añadirá con su foto.
@@ -119,11 +119,11 @@ export default function MembersForm({ initial, meId }: { initial: Member[]; meId
             placeholder="usuario-de-github"
             autoCapitalize="none"
             autoCorrect="off"
-            className="min-w-0 flex-1 rounded-xl border border-line bg-[#fafbfd] px-3.5 py-2.5 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 sm:text-[15px]"
+            className="min-w-0 flex-1 rounded-xl border border-line bg-field px-3.5 py-2.5 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 sm:text-[15px]"
           />
           <button
             disabled={pending || !username.trim()}
-            className="flex items-center gap-2 rounded-xl bg-[#161821] px-4 font-medium text-white hover:bg-black disabled:opacity-50"
+            className="flex items-center gap-2 rounded-xl bg-ink px-4 font-medium text-onink hover:opacity-90 disabled:opacity-50"
           >
             <UserPlus size={18} />
             <span className="hidden sm:inline">Invitar</span>

@@ -97,7 +97,7 @@ export default function ProjectView({
       <div className="flex items-center justify-between mb-6">
         <Link
           href={backHref}
-          className="grid size-11 place-items-center rounded-full bg-[#eef0f6] text-muted hover:bg-[#e3e5ef]"
+          className="grid size-11 place-items-center rounded-full bg-col text-muted hover:bg-soft3"
           aria-label="Volver"
         >
           <ArrowLeft size={20} />
@@ -105,7 +105,7 @@ export default function ProjectView({
         <div className="relative">
           <button
             onClick={() => setMenu((m) => !m)}
-            className="grid size-11 place-items-center rounded-full bg-[#eef0f6] hover:bg-[#e3e5ef]"
+            className="grid size-11 place-items-center rounded-full bg-col hover:bg-soft3"
             aria-label="Más opciones"
           >
             <MoreHorizontal size={20} />
@@ -113,10 +113,10 @@ export default function ProjectView({
           {menu && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenu(false)} />
-              <div className="absolute right-0 z-20 mt-2 w-44 rounded-2xl bg-white p-1.5 shadow-card-hover">
+              <div className="absolute right-0 z-20 mt-2 w-44 rounded-2xl bg-surface p-1.5 shadow-card-hover">
                 <button
                   onClick={() => { setMenu(false); setEditing(true); }}
-                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm hover:bg-[#f3f4f9]"
+                  className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-sm hover:bg-hov"
                 >
                   <Pencil size={16} /> Editar
                 </button>
@@ -141,7 +141,7 @@ export default function ProjectView({
           {project.category && <p className="mt-1 text-xl text-muted">{project.category}</p>}
           {project.description && <p className="mt-2 text-muted">{project.description}</p>}
         </div>
-        <aside className="rounded-3xl bg-[#eff0f6] p-5 lg:w-64 flex flex-row flex-wrap sm:flex-col justify-between sm:justify-center gap-4">
+        <aside className="rounded-3xl bg-col p-5 lg:w-64 flex flex-row flex-wrap sm:flex-col justify-between sm:justify-center gap-4">
           <div className="flex items-start gap-3">
             <CalendarDays size={22} className="mt-0.5 text-muted" strokeWidth={1.6} />
             <div>
@@ -160,7 +160,7 @@ export default function ProjectView({
               <div className="mt-1 flex -space-x-2">
                 {people.length === 0 && <span className="text-sm text-muted">Sin participantes</span>}
                 {people.map((m) => (
-                  <Avatar key={m.id} member={m} size={36} className="border-2 border-[#eff0f6]" />
+                  <Avatar key={m.id} member={m} size={36} className="border-2 border-col" />
                 ))}
               </div>
             </div>
@@ -180,7 +180,7 @@ export default function ProjectView({
           >
             {t.label}
             {t.id === "files" && (project.links?.length ?? 0) > 0 && (
-              <span className="ml-2 rounded-full bg-[#e8eaf3] px-1.5 py-0.5 text-xs">{project.links?.length}</span>
+              <span className="ml-2 rounded-full bg-chip px-1.5 py-0.5 text-xs">{project.links?.length}</span>
             )}
           </button>
         ))}
@@ -194,7 +194,7 @@ export default function ProjectView({
           <button
             onClick={() => setFilter(null)}
             className={`rounded-full px-3.5 py-1.5 text-sm transition-colors ${
-              activeFilter === null ? "bg-[#161821] text-white" : "bg-[#e8eaf3] text-muted hover:bg-[#dcdfec]"
+              activeFilter === null ? "bg-ink text-onink" : "bg-chip text-muted hover:bg-chip2"
             }`}
           >
             Todas
@@ -232,11 +232,11 @@ export default function ProjectView({
                 setDragId(null);
                 setOverCol(null);
               }}
-              className={`rounded-3xl p-3 transition-colors ${overCol === col.id ? "bg-[#e4e7f3]" : "bg-[#eff0f6]"}`}
+              className={`rounded-3xl p-3 transition-colors ${overCol === col.id ? "bg-colover" : "bg-col"}`}
             >
               <div className="flex items-center gap-2 px-2 py-2">
                 <h3 className="font-semibold">{col.label}</h3>
-                <span className="grid h-6 min-w-6 place-items-center rounded-full bg-[#dfe1ec] px-1.5 text-xs">
+                <span className="grid h-6 min-w-6 place-items-center rounded-full bg-chip2 px-1.5 text-xs">
                   {colTasks.length}
                 </span>
               </div>
@@ -247,7 +247,7 @@ export default function ProjectView({
                     draggable={editingId !== t.id}
                     onDragStart={() => setDragId(t.id)}
                     onDragEnd={() => { setDragId(null); setOverCol(null); }}
-                    className={`group flex items-start gap-3 rounded-2xl bg-white p-3.5 shadow-sm cursor-grab active:cursor-grabbing ${dragId === t.id ? "opacity-40" : ""}`}
+                    className={`group flex items-start gap-3 rounded-2xl bg-surface p-3.5 shadow-sm cursor-grab active:cursor-grabbing ${dragId === t.id ? "opacity-40" : ""}`}
                   >
                     <button
                       onClick={() => move(t.id, next(t.status))}
@@ -258,7 +258,7 @@ export default function ProjectView({
                           ? { background: "#34c26b", borderColor: "#34c26b", color: "#fff" }
                           : t.status === "doing"
                             ? { background: "#2f6bff", borderColor: "#2f6bff", color: "#fff" }
-                            : { borderColor: "#c4c7d6" }
+                            : { borderColor: "var(--edge)" }
                       }
                     >
                       {t.status !== "todo" && <Check size={14} strokeWidth={3} />}
@@ -304,7 +304,7 @@ export default function ProjectView({
                             selected={t.area && areas.includes(t.area) ? t.area : null}
                             onSelect={(v) => changeArea(t, v)}
                             options={[
-                              { value: null, label: "Sin parte", icon: <span className="size-3 rounded-full bg-[#d5d8e6]" /> },
+                              { value: null, label: "Sin parte", icon: <span className="size-3 rounded-full bg-edge" /> },
                               ...areas.map((a) => ({
                                 value: a,
                                 label: a,
@@ -317,7 +317,7 @@ export default function ProjectView({
                                 style={
                                   t.area && areas.includes(t.area)
                                     ? { background: `${areaColor(areas, t.area)}22`, color: areaColor(areas, t.area) }
-                                    : { background: "#eef0f6", color: "#8b8fa6" }
+                                    : { background: "var(--col)", color: "var(--faint)" }
                                 }
                               >
                                 {t.area && areas.includes(t.area) ? t.area : "Sin parte"}
@@ -347,7 +347,7 @@ export default function ProjectView({
                             value: null,
                             label: "Sin asignar",
                             icon: (
-                              <span className="grid size-7 place-items-center rounded-full border border-dashed border-[#c4c7d6] text-[#b6b9c9]">
+                              <span className="grid size-7 place-items-center rounded-full border border-dashed border-edge text-faint">
                                 <UserPlus size={14} />
                               </span>
                             ),
@@ -358,7 +358,7 @@ export default function ProjectView({
                           people.find((m) => m.id === t.assignee) ? (
                             <Avatar member={people.find((m) => m.id === t.assignee)!} size={28} />
                           ) : (
-                            <span className="grid size-7 place-items-center rounded-full border border-dashed border-[#c4c7d6] text-[#b6b9c9]">
+                            <span className="grid size-7 place-items-center rounded-full border border-dashed border-edge text-faint">
                               <UserPlus size={14} />
                             </span>
                           )
@@ -367,7 +367,7 @@ export default function ProjectView({
                     )}
                     <button
                       onClick={() => remove(t.id)}
-                      className="text-[#b6b9c9] p-1 transition hover:text-red-500 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
+                      className="text-faint p-1 transition hover:text-red-500 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
                       aria-label="Eliminar tarea"
                     >
                       <X size={16} />
@@ -422,14 +422,14 @@ function AddTask({
     return (
       <button
         onClick={() => setOpen(true)}
-        className="flex items-center justify-center gap-2 rounded-2xl bg-[#e4e6f1] py-3 text-muted transition hover:bg-[#dcdfec]"
+        className="flex items-center justify-center gap-2 rounded-2xl bg-colover py-3 text-muted transition hover:bg-chip2"
       >
         <Plus size={16} /> Añadir tarea
       </button>
     );
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-2 rounded-2xl bg-white p-3 shadow-sm">
+    <form onSubmit={submit} className="flex flex-col gap-2 rounded-2xl bg-surface p-3 shadow-sm">
       <input
         autoFocus
         value={title}
@@ -442,7 +442,7 @@ function AddTask({
         <select
           value={chosenArea}
           onChange={(e) => setArea(e.target.value)}
-          className="rounded-lg border border-line bg-white px-2 py-1.5 text-base text-muted sm:text-sm"
+          className="rounded-lg border border-line bg-surface px-2 py-1.5 text-base text-muted sm:text-sm"
           aria-label="Parte del proyecto"
         >
           <option value="">Sin parte</option>
@@ -457,7 +457,7 @@ function AddTask({
         <select
           value={people.some((m) => m.id === assignee) ? assignee : ""}
           onChange={(e) => setAssignee(e.target.value)}
-          className="rounded-lg border border-line bg-white px-2 py-1.5 text-base text-muted sm:text-sm"
+          className="rounded-lg border border-line bg-surface px-2 py-1.5 text-base text-muted sm:text-sm"
           aria-label="Responsable"
         >
           <option value="">Sin asignar</option>

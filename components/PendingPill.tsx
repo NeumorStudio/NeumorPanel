@@ -69,7 +69,7 @@ export default function PendingPill({
           const r = e.currentTarget.getBoundingClientRect();
           setPos({ top: r.bottom + 8, right: Math.max(16, window.innerWidth - r.right) });
         }}
-        className="absolute right-4 top-4 flex items-center gap-2 rounded-full bg-white/90 px-3 py-1.5 text-sm font-semibold shadow-sm backdrop-blur transition hover:bg-white active:scale-95"
+        className="absolute right-4 top-4 flex items-center gap-2 rounded-full bg-surface/90 px-3 py-1.5 text-sm font-semibold shadow-sm backdrop-blur transition hover:bg-surface active:scale-95"
       >
         <span className="size-2 rounded-full" style={{ background: accent }} />
         <span className="tabular-nums">{n}</span>
@@ -86,7 +86,7 @@ export default function PendingPill({
             <div
               ref={menuRef}
               role="menu"
-              className="fixed z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl bg-white shadow-[0_16px_48px_rgba(20,24,50,0.22)]"
+              className="fixed z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-2xl bg-surface shadow-[0_16px_48px_rgba(20,24,50,0.22)]"
               style={{ top: pos.top, right: pos.right }}
             >
               <ul className="max-h-72 overflow-y-auto p-1.5">
@@ -98,7 +98,7 @@ export default function PendingPill({
                       style={
                         t.status === "doing"
                           ? { background: "#2f6bff", borderColor: "#2f6bff" }
-                          : { borderColor: "#c4c7d6" }
+                          : { borderColor: "var(--edge)" }
                       }
                     />
                     <span className="min-w-0 flex-1 break-words text-sm leading-snug">{t.title}</span>
@@ -107,7 +107,7 @@ export default function PendingPill({
                     ) : (
                       <span
                         title="Sin asignar"
-                        className="grid size-[26px] shrink-0 place-items-center rounded-full border border-dashed border-[#c4c7d6] text-[#b6b9c9]"
+                        className="grid size-[26px] shrink-0 place-items-center rounded-full border border-dashed border-edge text-faint"
                       >
                         <UserPlus size={12} />
                       </span>
@@ -117,7 +117,7 @@ export default function PendingPill({
               </ul>
               <Link
                 href={href}
-                className="flex items-center justify-between border-t border-line px-4 py-2.5 text-sm font-medium text-primary hover:bg-[#f6f7fb]"
+                className="flex items-center justify-between border-t border-line px-4 py-2.5 text-sm font-medium text-primary hover:bg-hov"
               >
                 Abrir proyecto <ArrowRight size={15} />
               </Link>

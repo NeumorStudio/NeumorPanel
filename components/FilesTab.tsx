@@ -9,7 +9,7 @@ import { getTheme } from "@/lib/themes";
 import type { Member, Project } from "@/lib/types";
 
 const INPUT =
-  "rounded-xl border border-line bg-white px-3.5 py-2.5 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 sm:text-[15px]";
+  "rounded-xl border border-line bg-surface px-3.5 py-2.5 text-base outline-none focus:border-primary focus:ring-4 focus:ring-primary/10 sm:text-[15px]";
 
 function host(url: string) {
   try {
@@ -69,7 +69,7 @@ export default function FilesTab({ project, members }: { project: Project; membe
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
 
       {links.length === 0 ? (
-        <div className="mt-6 rounded-3xl border border-dashed border-[#d8dae6] bg-white/60 py-14 text-center">
+        <div className="mt-6 rounded-3xl border border-dashed border-edge bg-surface/60 py-14 text-center">
           <p className="font-semibold">Aún no hay enlaces</p>
           <p className="mt-1 text-muted">Guarda aquí lo que necesita el proyecto: diseños, documentos, repos…</p>
         </div>
@@ -78,7 +78,7 @@ export default function FilesTab({ project, members }: { project: Project; membe
           {links.map((l) => {
             const by = members.find((m) => m.id === l.by);
             return (
-              <div key={l.id} className="group flex items-center gap-3 rounded-2xl bg-white p-3.5 shadow-sm">
+              <div key={l.id} className="group flex items-center gap-3 rounded-2xl bg-surface p-3.5 shadow-sm">
                 <span
                   className="grid size-11 shrink-0 place-items-center rounded-xl text-white"
                   style={{ background: accent }}
@@ -106,7 +106,7 @@ export default function FilesTab({ project, members }: { project: Project; membe
                     onClick={() => {
                       if (confirm(`¿Eliminar el enlace «${l.title}»?`)) start(() => deleteLink(project.id, l.id));
                     }}
-                    className="p-1 text-[#b6b9c9] hover:text-red-500 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
+                    className="p-1 text-faint hover:text-red-500 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
                     aria-label="Eliminar enlace"
                   >
                     <X size={16} />
