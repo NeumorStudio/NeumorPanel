@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@vercel/blob": "2.8.2",
     "lucide-react": "^1.68.0",
     "next": "16.4.5",
     "next-auth": "^5.0.0-beta.32",
@@ -27,5 +28,10 @@
     "eslint-config-next": "16.4.5",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "@vercel/cli-config": {
+      "zod": "4.6.7"
+    }
   }
 }

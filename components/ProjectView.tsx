@@ -2,18 +2,32 @@
 
 import { useState, useTransition } from "react";
 import Link from "next/link";
-import { ArrowLeft, CalendarDays, UserPlus, Check, MoreHorizontal, Pencil, Plus, Trash2, Users, X } from "lucide-react";
+import {
+  ArrowLeft,
+  CalendarDays,
+  UserPlus,
+  Check,
+  Link2,
+  ListChecks,
+  MoreHorizontal,
+  Pencil,
+  Plus,
+  Trash2,
+  Users,
+  X,
+} from "lucide-react";
 import Cover from "./Cover";
 import ProjectDialog from "./ProjectDialog";
 import Avatar from "./Avatar";
 import FilesTab from "./FilesTab";
 import ActivityTab from "./ActivityTab";
 import OptionMenu from "./OptionMenu";
+import TaskSheet, { REVIEW_BG, STATUS_COLOR, shotSrc, type TaskPatch } from "./TaskSheet";
 import { STATUSES, type Member, type Project, type Task, type TaskStatus } from "@/lib/types";
 import { getTheme } from "@/lib/themes";
 import { areaColor } from "@/lib/areas";
 import { participantsOf } from "@/lib/participants";
-import { addTask, deleteProject, deleteTask, setTaskArea, setTaskAssignee, setTaskStatus, updateTask } from "@/app/actions";
+import { addTask, deleteProject, deleteTask, setTaskArea, setTaskAssignee, setTaskStatus } from "@/app/actions";
 
 const TABS = [
   { id: "tasks", label: "Tareas" },
@@ -29,10 +43,12 @@ function fmt(date?: string) {
 export default function ProjectView({
   project,
   members,
+  meId,
   backHref = "/",
 }: {
   project: Project;
   members: Member[];
+  meId: string;
   backHref?: string;
 }) {
   const [tasks, setTasks] = useState<Task[]>(project.tasks);
@@ -42,18 +58,28 @@ export default function ProjectView({
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<TaskStatus | null>(null);
   const [filter, setFilter] = useState<string | null>(null);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editTitle, setEditTitle] = useState("");
-  const [editDate, setEditDate] = useState("");
+  const [openId, setOpenId] = useState<string | null>(null);
   const [, start] = useTransition();
   const areas = project.areas ?? [];
   const people = participantsOf(project, members);
   const activeFilter = filter && areas.includes(filter) ? filter : null;
   const accent = getTheme(project.theme).accent;
+  const openTask = tasks.find((t) => t.id === openId);
+  const firstName = (m: Member) => m.name.split(" ")[0];
 
   function move(taskId: string, status: TaskStatus) {
-    setTasks((ts) => ts.map((t) => (t.id === taskId ? { ...t, status } : t)));
+    setTasks((ts) =>
+      ts.map((t) =>
+        t.id === taskId && t.status !== status
+          ? { ...t, status, reviewBy: status === "review" ? meId : undefined }
+          : t,
+      ),
+    );
     start(() => setTaskStatus(project.id, taskId, status));
+  }
+  /** Cambios que hace la ficha: se ven al momento; la ficha ya llama al servidor. */
+  function update(taskId: string, patch: TaskPatch) {
+    setTasks((ts) => ts.map((t) => (t.id === taskId ? { ...t, ...(typeof patch === "function" ? patch(t) : patch) } : t)));
   }
   function add(status: TaskStatus, title: string, dueDate?: string, area?: string, assignee?: string) {
     const task: Task = { id: crypto.randomUUID(), title, status, dueDate: dueDate || undefined, area, assignee };
@@ -62,23 +88,8 @@ export default function ProjectView({
   }
   function remove(taskId: string) {
     setTasks((ts) => ts.filter((t) => t.id !== taskId));
+    if (openId === taskId) setOpenId(null);
     start(() => deleteTask(project.id, taskId));
-  }
-  function startEdit(t: Task) {
-    setEditingId(t.id);
-    setEditTitle(t.title);
-    setEditDate(t.dueDate ?? "");
-  }
-  function saveEdit(e?: React.FormEvent) {
-    e?.preventDefault();
-    const title = editTitle.trim();
-    const id = editingId;
-    if (!id) return;
-    setEditingId(null);
-    if (!title) return;
-    const dueDate = editDate || undefined;
-    setTasks((ts) => ts.map((x) => (x.id === id ? { ...x, title, dueDate } : x)));
-    start(() => updateTask(project.id, id, { title, dueDate }));
   }
   function changeArea(t: Task, area: string | null) {
     setTasks((ts) => ts.map((x) => (x.id === t.id ? { ...x, area: area ?? undefined } : x)));
@@ -90,6 +101,11 @@ export default function ProjectView({
   }
   function next(s: TaskStatus): TaskStatus {
     return s === "todo" ? "doing" : s === "doing" ? "done" : "todo";
+  }
+  /** El círculo avanza de estado; en Revisar abre la ficha (ahí se aprueba o se piden cambios). */
+  function ring(t: Task) {
+    if (t.status === "review") setOpenId(t.id);
+    else move(t.id, next(t.status));
   }
 
   return (
@@ -217,7 +233,7 @@ export default function ProjectView({
       )}
 
       {tab === "tasks" && (
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {STATUSES.map((col) => {
           const colTasks = tasks.filter(
             (t) => t.status === col.id && (!activeFilter || t.area === activeFilter),
@@ -241,60 +257,90 @@ export default function ProjectView({
                 </span>
               </div>
               <div className="flex flex-col gap-2.5">
-                {colTasks.map((t) => (
+                {colTasks.map((t) => {
+                  const steps = t.steps ?? [];
+                  const images = (t.shots ?? []).filter((s) => s.image);
+                  const linksOnly = (t.shots ?? []).length - images.length;
+                  const reviewers = people.filter((m) => m.id !== t.reviewBy);
+                  return (
                   <div
                     key={t.id}
-                    draggable={editingId !== t.id}
+                    draggable
                     onDragStart={() => setDragId(t.id)}
                     onDragEnd={() => { setDragId(null); setOverCol(null); }}
                     className={`group flex items-start gap-3 rounded-2xl bg-surface p-3.5 shadow-sm cursor-grab active:cursor-grabbing ${dragId === t.id ? "opacity-40" : ""}`}
                   >
                     <button
-                      onClick={() => move(t.id, next(t.status))}
-                      title="Avanzar de estado"
+                      onClick={() => ring(t)}
+                      title={t.status === "review" ? "Abrir para revisar" : "Avanzar de estado"}
                       className="mt-0.5 grid size-7 shrink-0 place-items-center rounded-full border-2 transition-colors"
                       style={
-                        t.status === "done"
-                          ? { background: "#34c26b", borderColor: "#34c26b", color: "#fff" }
-                          : t.status === "doing"
-                            ? { background: "#2f6bff", borderColor: "#2f6bff", color: "#fff" }
-                            : { borderColor: "var(--edge)" }
+                        t.status === "todo"
+                          ? { borderColor: "var(--edge)" }
+                          : t.status === "review"
+                            ? { borderColor: STATUS_COLOR.review, color: STATUS_COLOR.review }
+                            : { background: STATUS_COLOR[t.status], borderColor: STATUS_COLOR[t.status], color: "#fff" }
                       }
                     >
-                      {t.status !== "todo" && <Check size={14} strokeWidth={3} />}
+                      {t.status === "review" ? (
+                        <span className="size-2.5 rounded-full" style={{ background: STATUS_COLOR.review }} />
+                      ) : (
+                        t.status !== "todo" && <Check size={14} strokeWidth={3} />
+                      )}
                     </button>
                     <div className="min-w-0 flex-1">
-                      {editingId === t.id ? (
-                        <form onSubmit={saveEdit} className="flex flex-col gap-2">
-                          <input
-                            autoFocus
-                            value={editTitle}
-                            onChange={(e) => setEditTitle(e.target.value)}
-                            onKeyDown={(e) => e.key === "Escape" && setEditingId(null)}
-                            className="w-full rounded-lg border border-line px-2 py-1 text-base outline-none focus:border-primary sm:text-[15px]"
-                          />
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="date"
-                              value={editDate}
-                              onChange={(e) => setEditDate(e.target.value)}
-                              className="rounded-lg border border-line px-2 py-1 text-sm text-muted"
-                            />
-                            <button type="submit" className="ml-auto rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white">
-                              Guardar
-                            </button>
-                            <button type="button" onClick={() => setEditingId(null)} className="text-sm text-muted">
-                              Cancelar
-                            </button>
-                          </div>
-                        </form>
-                      ) : (
-                        <p
-                          onClick={() => startEdit(t)}
-                          title="Pulsa para editar"
-                          className={`cursor-text break-words ${t.status === "done" ? "text-muted line-through" : ""}`}
+                      <button
+                        type="button"
+                        onClick={() => setOpenId(t.id)}
+                        title="Abrir la ficha"
+                        className={`block w-full break-words text-left hover:underline hover:decoration-edge hover:underline-offset-4 ${t.status === "done" ? "text-muted line-through" : ""}`}
+                      >
+                        {t.title}
+                      </button>
+                      {(steps.length > 0 || t.shots?.length) && (
+                        <button
+                          type="button"
+                          onClick={() => setOpenId(t.id)}
+                          className="mt-1.5 flex flex-wrap items-center gap-2.5 text-xs text-muted"
                         >
-                          {t.title}
+                          {steps.length > 0 && (
+                            <span className="flex items-center gap-1">
+                              <ListChecks size={14} /> {steps.filter((s) => s.done).length} de {steps.length}
+                            </span>
+                          )}
+                          {images.length > 0 && (
+                            <span className="flex -space-x-1.5">
+                              {images.slice(0, 3).map((s) => (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  key={s.id}
+                                  src={shotSrc(s)}
+                                  alt=""
+                                  loading="lazy"
+                                  className="size-6 rounded-md border-2 border-surface bg-col object-cover object-top"
+                                />
+                              ))}
+                            </span>
+                          )}
+                          {linksOnly > 0 && (
+                            <span className="flex items-center gap-1">
+                              <Link2 size={14} /> {linksOnly}
+                            </span>
+                          )}
+                        </button>
+                      )}
+                      {t.status === "review" && (
+                        <p className="mt-2 flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ background: REVIEW_BG }}>
+                          <span className="size-1.5 rounded-full" style={{ background: STATUS_COLOR.review }} />
+                          {t.reviewBy === meId
+                            ? `Le toca a ${reviewers.length === 1 ? firstName(reviewers[0]) : "los demás"}`
+                            : "Te toca revisarla"}
+                        </p>
+                      )}
+                      {(t.status === "todo" || t.status === "doing") && t.verdict?.kind === "changes" && (
+                        <p className="mt-2 flex w-fit items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ background: REVIEW_BG }}>
+                          <span className="size-1.5 rounded-full" style={{ background: STATUS_COLOR.review }} />
+                          Cambios pedidos
                         </p>
                       )}
                       {areas.length > 0 && (
@@ -326,7 +372,7 @@ export default function ProjectView({
                           />
                         </div>
                       )}
-                      {t.dueDate && editingId !== t.id && (
+                      {t.dueDate && (
                         <p className="mt-1 flex items-center gap-1.5 text-sm text-muted">
                           <CalendarDays size={14} /> {fmt(t.dueDate)}
                         </p>
@@ -366,14 +412,19 @@ export default function ProjectView({
                       />
                     )}
                     <button
-                      onClick={() => remove(t.id)}
+                      onClick={() => {
+                        // con ficha, se pregunta: se perderían textos, pasos y capturas
+                        const hasSheet = !!(t.brief || t.notes || steps.length || t.shots?.length);
+                        if (!hasSheet || confirm(`¿Eliminar «${t.title}» y su ficha?`)) remove(t.id);
+                      }}
                       className="text-faint p-1 transition hover:text-red-500 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100"
                       aria-label="Eliminar tarea"
                     >
                       <X size={16} />
                     </button>
                   </div>
-                ))}
+                  );
+                })}
                 <AddTask
                   areas={areas}
                   people={people}
@@ -388,6 +439,19 @@ export default function ProjectView({
       )}
 
       {editing && <ProjectDialog project={project} members={members} onClose={() => setEditing(false)} />}
+      {openTask && (
+        <TaskSheet
+          key={openTask.id}
+          task={openTask}
+          project={project}
+          people={people}
+          members={members}
+          meId={meId}
+          onChange={(patch) => update(openTask.id, patch)}
+          onDelete={() => remove(openTask.id)}
+          onClose={() => setOpenId(null)}
+        />
+      )}
     </div>
   );
 }
