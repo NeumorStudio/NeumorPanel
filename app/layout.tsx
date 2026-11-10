@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import Sidebar from "@/components/Sidebar";
@@ -12,6 +12,16 @@ const geistSans = Geist({
 export const metadata: Metadata = {
   title: "NeumorPanel",
   description: "Los proyectos de NeumorStudio, en un vistazo",
+  // instalado en el iPhone (pantalla de inicio): icono, nombre y barra de estado
+  icons: { apple: "/icons/apple-touch-icon.png" },
+  appleWebApp: { capable: true, title: "NeumorPanel", statusBarStyle: "default" },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f6f7fa" },
+    { media: "(prefers-color-scheme: dark)", color: "#171923" },
+  ],
 };
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
