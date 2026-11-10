@@ -8,7 +8,16 @@ import { THEME_LIST, normalizeTheme } from "@/lib/themes";
 import { normalizeAreas } from "@/lib/areas";
 import { participantsOf } from "@/lib/participants";
 import { projectPath, sectionPath } from "@/lib/paths";
-import { STATUSES, type ActivityType, type Project, type TaskStatus, type ThemeId } from "@/lib/types";
+import { MAX_SHOT_BYTES, deleteShots, isShotType, saveShot } from "@/lib/shots";
+import {
+  STATUSES,
+  type ActivityType,
+  type DB,
+  type Project,
+  type TaskShot,
+  type TaskStatus,
+  type ThemeId,
+} from "@/lib/types";
 
 type ProjectInput = {
   name: string;
@@ -42,6 +51,26 @@ function log(p: Project, by: string, type: ActivityType, text: string) {
     { id: crypto.randomUUID(), type, text, by, at: new Date().toISOString() },
     ...(p.activity ?? []),
   ].slice(0, MAX_ACTIVITY);
+}
+
+/** Igual que log(), pero no repite la misma entrada de la misma persona en 15 minutos
+ *  (la ficha se guarda sola al escribir: sin esto, la Actividad se llenaría). */
+function logOnce(p: Project, by: string, type: ActivityType, text: string) {
+  const last = p.activity?.[0];
+  if (last && last.by === by && last.text === text && Date.now() - Date.parse(last.at) < 15 * 60_000) return;
+  log(p, by, type, text);
+}
+
+const isStatus = (s: unknown): s is TaskStatus => STATUSES.some((x) => x.id === s);
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const MAX_TEXT = 4000;
+const MAX_STEPS = 30;
+const MAX_SHOTS = 12;
+
+function findTask(db: DB, projectId: string, taskId: string) {
+  const p = db.projects.find((x) => x.id === projectId);
+  const t = p?.tasks.find((x) => x.id === taskId);
+  return p && t ? { p, t } : null;
 }
 
 export async function createProject(input: ProjectInput) {
@@ -114,11 +143,12 @@ export async function updateProject(id: string, input: ProjectInput) {
 
 export async function deleteProject(id: string) {
   await requireUser();
-  const kind = await mutateDB((db) => {
-    const k = db.projects.find((p) => p.id === id)?.kind;
-    db.projects = db.projects.filter((p) => p.id !== id);
-    return k;
+  const { kind, images } = await mutateDB((db) => {
+    const p = db.projects.find((x) => x.id === id);
+    db.projects = db.projects.filter((x) => x.id !== id);
+    return { kind: p?.kind, images: p?.tasks.flatMap((t) => t.shots ?? []).map((s) => s.image) ?? [] };
   });
+  await deleteShots(images);
   revalidatePath("/");
   revalidatePath("/lab");
   redirect(sectionPath(kind));
@@ -133,13 +163,21 @@ export async function addTask(
 ) {
   const me = await requireUser();
   const title = task.title.trim();
-  if (!title) return;
+  if (!title || !isStatus(task.status)) return;
   await mutateDB((db) => {
     const p = db.projects.find((x) => x.id === projectId);
     if (!p) return;
     const area = task.area && p.areas?.includes(task.area) ? task.area : undefined;
     const assignee = participantsOf(p, db.members).find((m) => m.id === task.assignee)?.id;
-    p.tasks.push({ ...task, title, area, assignee });
+    p.tasks.push({
+      id: task.id,
+      title,
+      status: task.status,
+      dueDate: task.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(task.dueDate) ? task.dueDate : undefined,
+      area,
+      assignee,
+      reviewBy: task.status === "review" ? me.id : undefined,
+    });
     log(p, me.id, "task", `creó la tarea «${title}»`);
   });
   revalidateProject(projectId);
@@ -147,18 +185,185 @@ export async function addTask(
 
 export async function setTaskStatus(projectId: string, taskId: string, status: TaskStatus) {
   const me = await requireUser();
+  if (!isStatus(status)) return;
   await mutateDB((db) => {
-    const p = db.projects.find((x) => x.id === projectId);
-    const t = p?.tasks.find((x) => x.id === taskId);
-    if (!p || !t || t.status === status) return;
+    const found = findTask(db, projectId, taskId);
+    if (!found || found.t.status === status) return;
+    const { p, t } = found;
     t.status = status;
+    // Pasarla a Revisar es pedir el OK a los demás; sacarla de ahí lo retira.
+    if (status === "review") t.reviewBy = me.id;
+    else delete t.reviewBy;
     log(
       p,
       me.id,
       "task",
-      status === "done" ? `completó «${t.title}»` : `movió «${t.title}» a ${statusLabel(status)}`,
+      status === "review"
+        ? `pidió el OK de «${t.title}»`
+        : status === "done"
+          ? `completó «${t.title}»`
+          : `movió «${t.title}» a ${statusLabel(status)}`,
     );
   });
+  revalidateProject(projectId);
+}
+
+/** Aprobar: la tarea pasa a Hecho y el OK queda apuntado en la ficha. */
+export async function approveTask(projectId: string, taskId: string) {
+  const me = await requireUser();
+  await mutateDB((db) => {
+    const found = findTask(db, projectId, taskId);
+    // el OK lo da otro: quien pidió la revisión no se aprueba a sí mismo
+    if (!found || found.t.status !== "review" || found.t.reviewBy === me.id) return;
+    const { p, t } = found;
+    t.status = "done";
+    delete t.reviewBy;
+    t.verdict = { kind: "ok", by: me.id, at: new Date().toISOString() };
+    log(p, me.id, "task", `aprobó «${t.title}»`);
+  });
+  revalidateProject(projectId);
+}
+
+/** Pedir cambios: vuelve a En curso con una línea de por qué, que se queda en la ficha. */
+export async function requestChanges(projectId: string, taskId: string, rawNote: string) {
+  const me = await requireUser();
+  const note = rawNote.trim().slice(0, 500) || undefined;
+  await mutateDB((db) => {
+    const found = findTask(db, projectId, taskId);
+    if (!found || found.t.status !== "review" || found.t.reviewBy === me.id) return;
+    const { p, t } = found;
+    t.status = "doing";
+    delete t.reviewBy;
+    t.verdict = { kind: "changes", note, by: me.id, at: new Date().toISOString() };
+    log(p, me.id, "task", note ? `pidió cambios en «${t.title}»: ${note.slice(0, 140)}` : `pidió cambios en «${t.title}»`);
+  });
+  revalidateProject(projectId);
+}
+
+/** Textos de la ficha: quién lo pidió, lo que pidió y lo que hay. Solo cambia lo que llega. */
+export async function updateTaskBrief(
+  projectId: string,
+  taskId: string,
+  input: { briefFrom?: string; brief?: string; notes?: string },
+) {
+  const me = await requireUser();
+  await mutateDB((db) => {
+    const found = findTask(db, projectId, taskId);
+    if (!found) return;
+    const { p, t } = found;
+    let changed = false;
+    for (const key of ["briefFrom", "brief", "notes"] as const) {
+      const raw = input[key];
+      if (typeof raw !== "string") continue;
+      const value = raw.trim().slice(0, key === "briefFrom" ? 60 : MAX_TEXT) || undefined;
+      if ((t[key] ?? "") === (value ?? "")) continue;
+      t[key] = value;
+      changed = true;
+    }
+    if (changed) logOnce(p, me.id, "task", `actualizó la ficha de «${t.title}»`);
+  });
+  revalidateProject(projectId);
+}
+
+export async function addTaskStep(projectId: string, taskId: string, step: { id: string; text: string }) {
+  const me = await requireUser();
+  const text = step.text.trim().slice(0, 200);
+  if (!text) return;
+  await mutateDB((db) => {
+    const found = findTask(db, projectId, taskId);
+    if (!found || (found.t.steps?.length ?? 0) >= MAX_STEPS) return;
+    const { p, t } = found;
+    t.steps = [...(t.steps ?? []), { id: UUID.test(step.id) ? step.id : crypto.randomUUID(), text, done: false }];
+    logOnce(p, me.id, "task", `actualizó los pasos de «${t.title}»`);
+  });
+  revalidateProject(projectId);
+}
+
+export async function setTaskStepDone(projectId: string, taskId: string, stepId: string, done: boolean) {
+  const me = await requireUser();
+  await mutateDB((db) => {
+    const found = findTask(db, projectId, taskId);
+    const s = found?.t.steps?.find((x) => x.id === stepId);
+    if (!found || !s || s.done === !!done) return;
+    s.done = !!done;
+    if (s.done) log(found.p, me.id, "task", `marcó «${s.text}» en «${found.t.title}»`);
+  });
+  revalidateProject(projectId);
+}
+
+export async function deleteTaskStep(projectId: string, taskId: string, stepId: string) {
+  const me = await requireUser();
+  await mutateDB((db) => {
+    const found = findTask(db, projectId, taskId);
+    if (!found?.t.steps?.some((x) => x.id === stepId)) return;
+    const { p, t } = found;
+    t.steps = t.steps?.filter((x) => x.id !== stepId);
+    if (t.steps?.length === 0) delete t.steps;
+    logOnce(p, me.id, "task", `actualizó los pasos de «${t.title}»`);
+  });
+  revalidateProject(projectId);
+}
+
+/**
+ * Añade un resultado a la ficha: una captura, un enlace o los dos.
+ * Llega como FormData: label, url y image (ya comprimida en el navegador).
+ */
+export async function addTaskShot(
+  projectId: string,
+  taskId: string,
+  form: FormData,
+): Promise<{ error?: string; shot?: TaskShot }> {
+  const me = await requireUser();
+  const rawUrl = String(form.get("url") ?? "");
+  const url = rawUrl.trim() ? normalizeUrl(rawUrl) : undefined;
+  if (url === null) return { error: "Ese enlace no es válido (por ejemplo https://instagram.com/…)." };
+  const file = form.get("image");
+  const image = file instanceof Blob && file.size > 0 ? file : undefined;
+  if (!url && !image) return { error: "Añade una captura, un enlace o los dos." };
+  if (image && !isShotType(image.type)) return { error: "La captura tiene que ser una imagen (PNG, JPG o WebP)." };
+  if (image && image.size > MAX_SHOT_BYTES) return { error: "La captura pesa demasiado." };
+  const label =
+    String(form.get("label") ?? "").trim().slice(0, 60) || (url ? new URL(url).hostname.replace(/^www\./, "") : "Captura");
+
+  let pathname: string | undefined;
+  if (image) {
+    try {
+      pathname = await saveShot(image);
+    } catch (e) {
+      console.error("No se pudo guardar la captura", e);
+      return { error: "No se pudo guardar la captura. ¿Está conectado el almacén de archivos?" };
+    }
+  }
+  const shot: TaskShot = { id: crypto.randomUUID(), label, url, image: pathname, by: me.id, at: new Date().toISOString() };
+  const saved = await mutateDB((db) => {
+    const found = findTask(db, projectId, taskId);
+    if (!found || (found.t.shots?.length ?? 0) >= MAX_SHOTS) return false;
+    const { p, t } = found;
+    t.shots = [...(t.shots ?? []), shot];
+    log(p, me.id, "task", image ? `añadió una captura a «${t.title}»` : `añadió el enlace «${label}» a «${t.title}»`);
+    return true;
+  });
+  if (!saved) {
+    await deleteShots([pathname]);
+    return { error: `No se pudo añadir (máximo ${MAX_SHOTS} por tarea).` };
+  }
+  revalidateProject(projectId);
+  return { shot };
+}
+
+export async function deleteTaskShot(projectId: string, taskId: string, shotId: string) {
+  const me = await requireUser();
+  const image = await mutateDB((db) => {
+    const found = findTask(db, projectId, taskId);
+    const s = found?.t.shots?.find((x) => x.id === shotId);
+    if (!found || !s) return undefined;
+    const { p, t } = found;
+    t.shots = t.shots?.filter((x) => x.id !== shotId);
+    if (t.shots?.length === 0) delete t.shots;
+    log(p, me.id, "task", s.image ? `quitó una captura de «${t.title}»` : `quitó el enlace «${s.label}» de «${t.title}»`);
+    return s.image;
+  });
+  await deleteShots([image]);
   revalidateProject(projectId);
 }
 
@@ -220,13 +425,15 @@ export async function updateTask(
 
 export async function deleteTask(projectId: string, taskId: string) {
   const me = await requireUser();
-  await mutateDB((db) => {
+  const images = await mutateDB((db) => {
     const p = db.projects.find((x) => x.id === projectId);
     const t = p?.tasks.find((x) => x.id === taskId);
-    if (!p || !t) return;
+    if (!p || !t) return [];
     p.tasks = p.tasks.filter((x) => x.id !== taskId);
     log(p, me.id, "task", `eliminó la tarea «${t.title}»`);
+    return (t.shots ?? []).map((s) => s.image);
   });
+  await deleteShots(images);
   revalidateProject(projectId);
 }
 

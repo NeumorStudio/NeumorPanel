@@ -1,10 +1,40 @@
-export type TaskStatus = "todo" | "doing" | "done";
+/** "review" = Revisar: quien la mueve ahí pide el OK a los demás. */
+export type TaskStatus = "todo" | "doing" | "review" | "done";
 
 export const STATUSES: { id: TaskStatus; label: string }[] = [
   { id: "todo", label: "Por hacer" },
   { id: "doing", label: "En curso" },
+  { id: "review", label: "Revisar" },
   { id: "done", label: "Hecho" },
 ];
+
+/** Paso de una tarea: casilla dentro de la ficha. */
+export type TaskStep = {
+  id: string;
+  text: string;
+  done: boolean;
+};
+
+/**
+ * Resultado de una tarea: una captura, un enlace o las dos cosas
+ * (la captura para verlo sin salir del panel y el enlace a lo real).
+ */
+export type TaskShot = {
+  id: string;
+  label: string; // p. ej. "Instagram"
+  url?: string; // lo real: el perfil, la preview, la web…
+  image?: string; // ruta de la imagen en el almacén privado (ver lib/shots.ts)
+  by: string; // id del miembro
+  at: string; // ISO
+};
+
+/** Último veredicto de la revisión: se queda en la ficha. */
+export type TaskVerdict = {
+  kind: "ok" | "changes";
+  note?: string; // por qué se piden cambios
+  by: string;
+  at: string;
+};
 
 export type Task = {
   id: string;
@@ -13,6 +43,14 @@ export type Task = {
   dueDate?: string; // YYYY-MM-DD
   area?: string; // una de las partes del proyecto (p. ej. "Web", "Cliente")
   assignee?: string; // id del miembro responsable
+  // --- Ficha (todo opcional: una tarea sencilla sigue siendo un título) ---
+  briefFrom?: string; // quién lo pidió (p. ej. "Humberto")
+  brief?: string; // lo que pidió, con sus palabras
+  notes?: string; // lo que hay hecho ya
+  steps?: TaskStep[];
+  shots?: TaskShot[];
+  reviewBy?: string; // quién la pasó a Revisar (le toca a los demás)
+  verdict?: TaskVerdict;
 };
 
 export type ThemeId = "blue" | "orange" | "green" | "purple" | "pink" | "teal";

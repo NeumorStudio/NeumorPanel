@@ -52,8 +52,9 @@ export default function PendingPill({
     };
   }, [open]);
 
-  // En curso primero, luego por hacer; dentro de cada grupo se respeta el orden.
-  const sorted = [...tasks].sort((a, b) => Number(b.status === "doing") - Number(a.status === "doing"));
+  // Revisar primero, luego en curso y por hacer; dentro de cada grupo se respeta el orden.
+  const rank = (s: TaskStatus) => (s === "review" ? 2 : s === "doing" ? 1 : 0);
+  const sorted = [...tasks].sort((a, b) => rank(b.status) - rank(a.status));
 
   return (
     <>
@@ -94,11 +95,13 @@ export default function PendingPill({
                   <li key={t.id} className="flex items-center gap-3 rounded-xl px-2.5 py-2">
                     <span
                       className="size-3 shrink-0 rounded-full border-2"
-                      title={t.status === "doing" ? "En curso" : "Por hacer"}
+                      title={t.status === "review" ? "Revisar" : t.status === "doing" ? "En curso" : "Por hacer"}
                       style={
-                        t.status === "doing"
-                          ? { background: "#2f6bff", borderColor: "#2f6bff" }
-                          : { borderColor: "var(--edge)" }
+                        t.status === "review"
+                          ? { background: "#f59e0b", borderColor: "#f59e0b" }
+                          : t.status === "doing"
+                            ? { background: "#2f6bff", borderColor: "#2f6bff" }
+                            : { borderColor: "var(--edge)" }
                       }
                     />
                     <span className="min-w-0 flex-1 break-words text-sm leading-snug">{t.title}</span>
