@@ -109,7 +109,7 @@ export default function PushSettings({ publicKey }: { publicKey: string | null }
     <section className="rounded-3xl bg-surface p-6 shadow-card">
       <h2 className="text-xl font-semibold">Avisos</h2>
       <p className="mb-5 text-muted">
-        Te avisa en este dispositivo cuando te asignan una tarea. Solo las tuyas.
+        Te avisa en este dispositivo cuando te asignan una tarea o te piden el OK. Solo lo tuyo.
       </p>
 
       {!publicKey ? (

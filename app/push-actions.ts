@@ -53,7 +53,7 @@ export async function sendTestPush(): Promise<{ error?: string }> {
   if (!pushPublicKey()) return { error: "Los avisos aún no están configurados en el servidor." };
   const sent = await notifyMember(me.id, {
     title: "Avisos activados",
-    body: "Así te llegará cuando te asignen una tarea.",
+    body: "Así te llegará cuando te asignen una tarea o te pidan el OK.",
     url: "/settings",
     tag: "prueba",
   });
