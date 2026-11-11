@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { after } from "next/server";
 import { mutateDB } from "@/lib/db";
 import { requireUser } from "@/lib/session";
 import { THEME_LIST, normalizeTheme } from "@/lib/themes";
@@ -9,6 +10,7 @@ import { normalizeAreas } from "@/lib/areas";
 import { participantsOf } from "@/lib/participants";
 import { projectPath, sectionPath } from "@/lib/paths";
 import { MAX_SHOT_BYTES, deleteShots, isShotType, saveShot } from "@/lib/shots";
+import { notifyMember, type PushMessage } from "@/lib/push";
 import {
   STATUSES,
   type ActivityType,
@@ -66,6 +68,45 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_TEXT = 4000;
 const MAX_STEPS = 30;
 const MAX_SHOTS = 12;
+
+type Notice = { to: string; msg: PushMessage };
+
+/**
+ * Aviso a una persona sobre una tarea (se la han dado, le piden el OK o le
+ * responden). Nunca a quien hace el cambio: no hace falta avisarte de lo tuyo.
+ * `detail` es la segunda línea; por defecto, el proyecto.
+ */
+function taskNotice(
+  to: string | undefined,
+  me: { id: string; name: string },
+  p: Project,
+  task: { id: string; title: string },
+  title: string,
+  detail: string = p.name,
+): Notice | null {
+  if (!to || to === me.id) return null;
+  return {
+    to,
+    msg: {
+      title,
+      body: `${task.title}\n${detail} · de ${me.name.split(" ")[0]}`,
+      url: `${projectPath(p)}?tarea=${task.id}`,
+      tag: `tarea-${task.id}`, // los de la misma tarea se sustituyen
+    },
+  };
+}
+
+/** Pedir el OK de una tarea avisa a los demás del proyecto. */
+function reviewNotices(db: DB, me: { id: string; name: string }, p: Project, task: { id: string; title: string }) {
+  return participantsOf(p, db.members)
+    .map((m) => taskNotice(m.id, me, p, task, "Te piden el OK"))
+    .filter((n): n is Notice => n !== null);
+}
+
+/** Se mandan cuando la respuesta ya ha salido: guardar la tarea no espera a los avisos. */
+function sendNotices(notices: (Notice | null)[] | null | undefined) {
+  for (const n of notices ?? []) if (n) after(() => notifyMember(n.to, n.msg));
+}
 
 function findTask(db: DB, projectId: string, taskId: string) {
   const p = db.projects.find((x) => x.id === projectId);
@@ -164,9 +205,9 @@ export async function addTask(
   const me = await requireUser();
   const title = task.title.trim();
   if (!title || !isStatus(task.status)) return;
-  await mutateDB((db) => {
+  const notices = await mutateDB((db) => {
     const p = db.projects.find((x) => x.id === projectId);
-    if (!p) return;
+    if (!p) return null;
     const area = task.area && p.areas?.includes(task.area) ? task.area : undefined;
     const assignee = participantsOf(p, db.members).find((m) => m.id === task.assignee)?.id;
     p.tasks.push({
@@ -179,16 +220,20 @@ export async function addTask(
       reviewBy: task.status === "review" ? me.id : undefined,
     });
     log(p, me.id, "task", `creó la tarea «${title}»`);
+    // creada ya en Revisar: es pedir el OK (a quien la tenga también le llega por ahí)
+    if (task.status === "review") return reviewNotices(db, me, p, { id: task.id, title });
+    return [taskNotice(assignee, me, p, { id: task.id, title }, "Nueva tarea para ti")];
   });
+  sendNotices(notices);
   revalidateProject(projectId);
 }
 
 export async function setTaskStatus(projectId: string, taskId: string, status: TaskStatus) {
   const me = await requireUser();
   if (!isStatus(status)) return;
-  await mutateDB((db) => {
+  const notices = await mutateDB((db) => {
     const found = findTask(db, projectId, taskId);
-    if (!found || found.t.status === status) return;
+    if (!found || found.t.status === status) return null;
     const { p, t } = found;
     t.status = status;
     // Pasarla a Revisar es pedir el OK a los demás; sacarla de ahí lo retira.
@@ -204,23 +249,28 @@ export async function setTaskStatus(projectId: string, taskId: string, status: T
           ? `completó «${t.title}»`
           : `movió «${t.title}» a ${statusLabel(status)}`,
     );
+    return status === "review" ? reviewNotices(db, me, p, t) : null;
   });
+  sendNotices(notices);
   revalidateProject(projectId);
 }
 
 /** Aprobar: la tarea pasa a Hecho y el OK queda apuntado en la ficha. */
 export async function approveTask(projectId: string, taskId: string) {
   const me = await requireUser();
-  await mutateDB((db) => {
+  const notice = await mutateDB((db) => {
     const found = findTask(db, projectId, taskId);
     // el OK lo da otro: quien pidió la revisión no se aprueba a sí mismo
-    if (!found || found.t.status !== "review" || found.t.reviewBy === me.id) return;
+    if (!found || found.t.status !== "review" || found.t.reviewBy === me.id) return null;
     const { p, t } = found;
+    const askedBy = t.reviewBy;
     t.status = "done";
     delete t.reviewBy;
     t.verdict = { kind: "ok", by: me.id, at: new Date().toISOString() };
     log(p, me.id, "task", `aprobó «${t.title}»`);
+    return taskNotice(askedBy, me, p, t, "Tarea aprobada");
   });
+  sendNotices([notice]);
   revalidateProject(projectId);
 }
 
@@ -228,15 +278,19 @@ export async function approveTask(projectId: string, taskId: string) {
 export async function requestChanges(projectId: string, taskId: string, rawNote: string) {
   const me = await requireUser();
   const note = rawNote.trim().slice(0, 500) || undefined;
-  await mutateDB((db) => {
+  const notice = await mutateDB((db) => {
     const found = findTask(db, projectId, taskId);
-    if (!found || found.t.status !== "review" || found.t.reviewBy === me.id) return;
+    if (!found || found.t.status !== "review" || found.t.reviewBy === me.id) return null;
     const { p, t } = found;
+    const askedBy = t.reviewBy;
     t.status = "doing";
     delete t.reviewBy;
     t.verdict = { kind: "changes", note, by: me.id, at: new Date().toISOString() };
     log(p, me.id, "task", note ? `pidió cambios en «${t.title}»: ${note.slice(0, 140)}` : `pidió cambios en «${t.title}»`);
+    const why = note ? `«${note.length > 120 ? note.slice(0, 119) + "…" : note}»` : p.name;
+    return taskNotice(askedBy, me, p, t, "Te piden cambios", why);
   });
+  sendNotices([notice]);
   revalidateProject(projectId);
 }
 
@@ -381,19 +435,23 @@ export async function setTaskArea(projectId: string, taskId: string, area: strin
 
 export async function setTaskAssignee(projectId: string, taskId: string, assignee: string | null) {
   const me = await requireUser();
-  await mutateDB((db) => {
+  const notice = await mutateDB((db) => {
     const p = db.projects.find((x) => x.id === projectId);
     const t = p?.tasks.find((x) => x.id === taskId);
-    if (!p || !t) return;
+    if (!p || !t) return null;
     const who = participantsOf(p, db.members).find((m) => m.id === assignee);
     if (who) {
+      const changed = t.assignee !== who.id;
       t.assignee = who.id;
       log(p, me.id, "task", `asignó «${t.title}» a ${who.name}`);
+      if (changed) return taskNotice(who.id, me, p, t, "Te han asignado una tarea");
     } else if (t.assignee) {
       delete t.assignee;
       log(p, me.id, "task", `quitó el responsable de «${t.title}»`);
     }
+    return null;
   });
+  sendNotices([notice]);
   revalidateProject(projectId);
 }
 
@@ -538,6 +596,8 @@ export async function removeMember(id: string): Promise<{ error?: string }> {
       if (p.members) p.members = p.members.filter((x) => x !== id);
       for (const t of p.tasks) if (t.assignee === id) delete t.assignee;
     }
+    // y deja de avisar en sus dispositivos
+    if (db.push) db.push = db.push.filter((s) => s.memberId !== id);
   });
   revalidatePath("/", "layout");
   return {};

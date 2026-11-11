@@ -45,11 +45,13 @@ export default function ProjectView({
   members,
   meId,
   backHref = "/",
+  initialOpen,
 }: {
   project: Project;
   members: Member[];
   meId: string;
   backHref?: string;
+  initialOpen?: string; // tarea que se abre al entrar (p. ej. al tocar un aviso)
 }) {
   const [tasks, setTasks] = useState<Task[]>(project.tasks);
   const [menu, setMenu] = useState(false);
@@ -58,7 +60,9 @@ export default function ProjectView({
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<TaskStatus | null>(null);
   const [filter, setFilter] = useState<string | null>(null);
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(
+    initialOpen && project.tasks.some((t) => t.id === initialOpen) ? initialOpen : null,
+  );
   const [, start] = useTransition();
   const areas = project.areas ?? [];
   const people = participantsOf(project, members);
@@ -449,7 +453,11 @@ export default function ProjectView({
           meId={meId}
           onChange={(patch) => update(openTask.id, patch)}
           onDelete={() => remove(openTask.id)}
-          onClose={() => setOpenId(null)}
+          onClose={() => {
+            setOpenId(null);
+            // si se abrió desde un aviso, al recargar no debe volver a abrirse
+            if (location.search.includes("tarea=")) history.replaceState(null, "", location.pathname);
+          }}
         />
       )}
     </div>

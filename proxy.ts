@@ -13,6 +13,8 @@ export default auth((req) => {
   }
 });
 
+// El manifiesto, el service worker y los iconos se sirven sin sesión: el navegador
+// los pide por su cuenta (y una redirección rompería la instalación y los avisos).
 export const config = {
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
+  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico|manifest.webmanifest|sw.js|icons/).*)"],
 };

@@ -7,6 +7,7 @@ import { THEME_LIST } from "@/lib/themes";
 import type { Member } from "@/lib/types";
 import { inviteMember, removeMember, saveMembers } from "@/app/actions";
 import Avatar from "./Avatar";
+import { stopPushHere } from "@/lib/push-client";
 
 export default function MembersForm({ initial, meId }: { initial: Member[]; meId: string }) {
   const [members, setMembers] = useState(initial);
@@ -133,7 +134,11 @@ export default function MembersForm({ initial, meId }: { initial: Member[]; meId
       </section>
 
       <button
-        onClick={() => signOut({ redirectTo: "/login" })}
+        onClick={async () => {
+          // al salir, este dispositivo deja de recibir tus avisos
+          await stopPushHere().catch(() => undefined);
+          await signOut({ redirectTo: "/login" });
+        }}
         className="flex w-fit items-center gap-2 px-1 text-muted hover:text-foreground"
       >
         <LogOut size={18} /> Cerrar sesión

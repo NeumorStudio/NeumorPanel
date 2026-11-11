@@ -117,8 +117,21 @@ export type Vault = {
   lockUntil?: number;
 };
 
+/**
+ * Un dispositivo que recibe avisos (suscripción Web Push de un navegador o de la app
+ * instalada). Solo lo usa el servidor: nunca se manda al navegador.
+ */
+export type PushSub = {
+  id: string;
+  memberId: string; // a quién se avisa en este dispositivo
+  endpoint: string; // dirección del servicio de avisos del navegador
+  keys: { p256dh: string; auth: string };
+  at: string; // ISO
+};
+
 export type DB = {
   members: Member[];
   projects: Project[];
   vault?: Vault;
+  push?: PushSub[];
 };
