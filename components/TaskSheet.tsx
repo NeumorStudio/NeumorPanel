@@ -81,9 +81,11 @@ export default function TaskSheet({
   const firstName = (id?: string) => members.find((m) => m.id === id)?.name.split(" ")[0] ?? "Alguien";
   const names = (list: Member[]) =>
     list.length === 0 ? "nadie" : list.length === 1 ? list[0].name.split(" ")[0] : "los demás";
-  const assignee = people.find((m) => m.id === task.assignee);
   const areas = project.areas ?? [];
-  const area = task.area && areas.includes(task.area) ? task.area : null;
+  const taskAreas = (task.areas ?? []).filter((a) => areas.includes(a));
+  const assignees = (task.assignees ?? [])
+    .map((id) => people.find((m) => m.id === id))
+    .filter((m): m is Member => !!m);
   const steps = task.steps ?? [];
   const shots = task.shots ?? [];
   const images = shots.filter((s) => s.image);
@@ -221,17 +223,24 @@ export default function TaskSheet({
                 <span className="size-2 rounded-full" style={{ background: STATUS_COLOR[task.status] }} />
                 {statusLabel}
               </span>
-              {area && (
+              {taskAreas.map((a) => (
                 <span
+                  key={a}
                   className="rounded-full px-2.5 py-0.5 font-medium"
-                  style={{ background: `${areaColor(areas, area)}22`, color: areaColor(areas, area) }}
+                  style={{ background: `${areaColor(areas, a)}22`, color: areaColor(areas, a) }}
                 >
-                  {area}
+                  {a}
                 </span>
-              )}
+              ))}
               <span className="truncate text-muted">{project.name}</span>
             </div>
-            {assignee && <Avatar member={assignee} size={30} />}
+            {assignees.length > 0 && (
+              <span className="flex -space-x-2">
+                {assignees.map((m) => (
+                  <Avatar key={m.id} member={m} size={30} className="border-2 border-surface" />
+                ))}
+              </span>
+            )}
             <button
               type="button"
               onClick={close}

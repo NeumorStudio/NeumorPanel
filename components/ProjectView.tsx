@@ -27,7 +27,7 @@ import { STATUSES, type Member, type Project, type Task, type TaskStatus } from 
 import { getTheme } from "@/lib/themes";
 import { areaColor } from "@/lib/areas";
 import { participantsOf } from "@/lib/participants";
-import { addTask, deleteProject, deleteTask, setTaskArea, setTaskAssignee, setTaskStatus } from "@/app/actions";
+import { addTask, deleteProject, deleteTask, setTaskAreas, setTaskAssignees, setTaskStatus } from "@/app/actions";
 
 const TABS = [
   { id: "tasks", label: "Tareas" },
@@ -70,6 +70,9 @@ export default function ProjectView({
   const accent = getTheme(project.theme).accent;
   const openTask = tasks.find((t) => t.id === openId);
   const firstName = (m: Member) => m.name.split(" ")[0];
+  /** Responsables de una tarea, ya resueltos a miembros del equipo. */
+  const assignedPeople = (t: Task) =>
+    (t.assignees ?? []).map((id) => people.find((m) => m.id === id)).filter((m): m is Member => !!m);
 
   function move(taskId: string, status: TaskStatus) {
     setTasks((ts) =>
@@ -85,8 +88,21 @@ export default function ProjectView({
   function update(taskId: string, patch: TaskPatch) {
     setTasks((ts) => ts.map((t) => (t.id === taskId ? { ...t, ...(typeof patch === "function" ? patch(t) : patch) } : t)));
   }
-  function add(status: TaskStatus, title: string, dueDate?: string, area?: string, assignee?: string) {
-    const task: Task = { id: crypto.randomUUID(), title, status, dueDate: dueDate || undefined, area, assignee };
+  function add(
+    status: TaskStatus,
+    title: string,
+    dueDate?: string,
+    nextAreas?: string[],
+    nextAssignees?: string[],
+  ) {
+    const task: Task = {
+      id: crypto.randomUUID(),
+      title,
+      status,
+      dueDate: dueDate || undefined,
+      areas: nextAreas,
+      assignees: nextAssignees,
+    };
     setTasks((ts) => [...ts, task]);
     start(() => addTask(project.id, task));
   }
@@ -95,13 +111,23 @@ export default function ProjectView({
     if (openId === taskId) setOpenId(null);
     start(() => deleteTask(project.id, taskId));
   }
-  function changeArea(t: Task, area: string | null) {
-    setTasks((ts) => ts.map((x) => (x.id === t.id ? { ...x, area: area ?? undefined } : x)));
-    start(() => setTaskArea(project.id, t.id, area));
+  function changeAreas(t: Task, next: string[]) {
+    const value = next.filter((a) => areas.includes(a));
+    setTasks((ts) => ts.map((x) => (x.id === t.id ? { ...x, areas: value } : x)));
+    start(() => setTaskAreas(project.id, t.id, value));
   }
-  function changeAssignee(t: Task, assignee: string | null) {
-    setTasks((ts) => ts.map((x) => (x.id === t.id ? { ...x, assignee: assignee ?? undefined } : x)));
-    start(() => setTaskAssignee(project.id, t.id, assignee));
+  function toggleArea(t: Task, area: string) {
+    const cur = t.areas ?? [];
+    changeAreas(t, cur.includes(area) ? cur.filter((a) => a !== area) : [...cur, area]);
+  }
+  function changeAssignees(t: Task, next: string[]) {
+    const value = next.filter((id) => people.some((m) => m.id === id));
+    setTasks((ts) => ts.map((x) => (x.id === t.id ? { ...x, assignees: value } : x)));
+    start(() => setTaskAssignees(project.id, t.id, value));
+  }
+  function toggleAssignee(t: Task, id: string) {
+    const cur = t.assignees ?? [];
+    changeAssignees(t, cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]);
   }
   function next(s: TaskStatus): TaskStatus {
     return s === "todo" ? "doing" : s === "doing" ? "done" : "todo";
@@ -240,7 +266,7 @@ export default function ProjectView({
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {STATUSES.map((col) => {
           const colTasks = tasks.filter(
-            (t) => t.status === col.id && (!activeFilter || t.area === activeFilter),
+            (t) => t.status === col.id && (!activeFilter || (t.areas ?? []).includes(activeFilter)),
           );
           return (
             <div
@@ -350,27 +376,38 @@ export default function ProjectView({
                       {areas.length > 0 && (
                         <div className="mt-1.5 w-fit">
                           <OptionMenu
-                            title="Cambiar de parte"
-                            selected={t.area && areas.includes(t.area) ? t.area : null}
-                            onSelect={(v) => changeArea(t, v)}
-                            options={[
-                              { value: null, label: "Sin parte", icon: <span className="size-3 rounded-full bg-edge" /> },
-                              ...areas.map((a) => ({
-                                value: a,
-                                label: a,
-                                icon: <span className="size-3 rounded-full" style={{ background: areaColor(areas, a) }} />,
-                              })),
-                            ]}
+                            multiple
+                            title="Partes de la tarea"
+                            selected={(t.areas ?? []).filter((a) => areas.includes(a))}
+                            onToggle={(a) => toggleArea(t, a)}
+                            clear={{ label: "Sin parte", icon: <span className="size-3 rounded-full bg-edge" /> }}
+                            onClear={() => changeAreas(t, [])}
+                            options={areas.map((a) => ({
+                              value: a,
+                              label: a,
+                              icon: <span className="size-3 rounded-full" style={{ background: areaColor(areas, a) }} />,
+                            }))}
                             trigger={
-                              <span
-                                className="block rounded-full px-2.5 py-0.5 text-xs font-medium"
-                                style={
-                                  t.area && areas.includes(t.area)
-                                    ? { background: `${areaColor(areas, t.area)}22`, color: areaColor(areas, t.area) }
-                                    : { background: "var(--col)", color: "var(--faint)" }
-                                }
-                              >
-                                {t.area && areas.includes(t.area) ? t.area : "Sin parte"}
+                              <span className="flex flex-wrap items-center gap-1">
+                                {(t.areas ?? []).filter((a) => areas.includes(a)).length === 0 && (
+                                  <span className="rounded-full bg-col px-2.5 py-0.5 text-xs font-medium text-faint">
+                                    Sin parte
+                                  </span>
+                                )}
+                                {(t.areas ?? [])
+                                  .filter((a) => areas.includes(a))
+                                  .map((a) => (
+                                    <span
+                                      key={a}
+                                      className="rounded-full px-2.5 py-0.5 text-xs font-medium"
+                                      style={{ background: `${areaColor(areas, a)}22`, color: areaColor(areas, a) }}
+                                    >
+                                      {a}
+                                    </span>
+                                  ))}
+                                <span className="grid size-5 place-items-center rounded-full border border-dashed border-edge text-faint">
+                                  <Plus size={11} />
+                                </span>
                               </span>
                             }
                           />
@@ -384,29 +421,36 @@ export default function ProjectView({
                     </div>
                     {people.length > 0 && (
                       <OptionMenu
+                        multiple
                         align="right"
                         title={
-                          people.find((m) => m.id === t.assignee)
-                            ? `Responsable: ${people.find((m) => m.id === t.assignee)?.name}`
-                            : "Asignar responsable"
+                          assignedPeople(t).length
+                            ? `Responsables: ${assignedPeople(t).map((m) => m.name).join(", ")}`
+                            : "Asignar responsables"
                         }
-                        selected={people.some((m) => m.id === t.assignee) ? (t.assignee ?? null) : null}
-                        onSelect={(v) => changeAssignee(t, v)}
-                        options={[
-                          {
-                            value: null,
-                            label: "Sin asignar",
-                            icon: (
-                              <span className="grid size-7 place-items-center rounded-full border border-dashed border-edge text-faint">
-                                <UserPlus size={14} />
-                              </span>
-                            ),
-                          },
-                          ...people.map((m) => ({ value: m.id, label: m.name, icon: <Avatar member={m} size={28} /> })),
-                        ]}
+                        selected={assignedPeople(t).map((m) => m.id)}
+                        onToggle={(id) => toggleAssignee(t, id)}
+                        onClear={() => changeAssignees(t, [])}
+                        clear={{
+                          label: "Sin asignar",
+                          icon: (
+                            <span className="grid size-7 place-items-center rounded-full border border-dashed border-edge text-faint">
+                              <UserPlus size={14} />
+                            </span>
+                          ),
+                        }}
+                        options={people.map((m) => ({
+                          value: m.id,
+                          label: m.name,
+                          icon: <Avatar member={m} size={28} />,
+                        }))}
                         trigger={
-                          people.find((m) => m.id === t.assignee) ? (
-                            <Avatar member={people.find((m) => m.id === t.assignee)!} size={28} />
+                          assignedPeople(t).length ? (
+                            <span className="flex -space-x-2">
+                              {assignedPeople(t).map((m) => (
+                                <Avatar key={m.id} member={m} size={28} className="border-2 border-surface" />
+                              ))}
+                            </span>
                           ) : (
                             <span className="grid size-7 place-items-center rounded-full border border-dashed border-edge text-faint">
                               <UserPlus size={14} />
@@ -433,7 +477,7 @@ export default function ProjectView({
                   areas={areas}
                   people={people}
                   defaultArea={activeFilter ?? undefined}
-                  onAdd={(title, date, area, assignee) => add(col.id, title, date, area, assignee)}
+                  onAdd={(title, date, nextAreas, nextAssignees) => add(col.id, title, date, nextAreas, nextAssignees)}
                 />
               </div>
             </div>
@@ -470,7 +514,7 @@ function AddTask({
   people,
   defaultArea,
 }: {
-  onAdd: (title: string, date?: string, area?: string, assignee?: string) => void;
+  onAdd: (title: string, date?: string, areas?: string[], assignees?: string[]) => void;
   areas: string[];
   people: Member[];
   defaultArea?: string;
@@ -478,14 +522,21 @@ function AddTask({
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [date, setDate] = useState("");
-  const [area, setArea] = useState("");
-  const [assignee, setAssignee] = useState("");
-  const chosenArea = area && areas.includes(area) ? area : (defaultArea ?? "");
+  const [chosenAreas, setChosenAreas] = useState<string[]>(defaultArea ? [defaultArea] : []);
+  const [chosenPeople, setChosenPeople] = useState<string[]>([]);
+
+  const toggle = (list: string[], value: string) =>
+    list.includes(value) ? list.filter((x) => x !== value) : [...list, value];
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
-    onAdd(title.trim(), date, chosenArea || undefined, people.some((m) => m.id === assignee) ? assignee : undefined);
+    onAdd(
+      title.trim(),
+      date,
+      chosenAreas.filter((a) => areas.includes(a)),
+      chosenPeople.filter((id) => people.some((m) => m.id === id)),
+    );
     setTitle("");
     setDate("");
   }
@@ -511,34 +562,46 @@ function AddTask({
         className="w-full bg-transparent outline-none"
       />
       {areas.length > 0 && (
-        <select
-          value={chosenArea}
-          onChange={(e) => setArea(e.target.value)}
-          className="rounded-lg border border-line bg-surface px-2 py-1.5 text-base text-muted sm:text-sm"
-          aria-label="Parte del proyecto"
-        >
-          <option value="">Sin parte</option>
-          {areas.map((a) => (
-            <option key={a} value={a}>
-              {a}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Partes del proyecto">
+          {areas.map((a) => {
+            const on = chosenAreas.includes(a);
+            return (
+              <button
+                type="button"
+                key={a}
+                aria-pressed={on}
+                onClick={() => setChosenAreas((cur) => toggle(cur, a))}
+                className="rounded-full px-2.5 py-0.5 text-xs font-medium transition"
+                style={
+                  on
+                    ? { background: areaColor(areas, a), color: "#fff" }
+                    : { background: `${areaColor(areas, a)}1f`, color: areaColor(areas, a) }
+                }
+              >
+                {a}
+              </button>
+            );
+          })}
+        </div>
       )}
       {people.length > 0 && (
-        <select
-          value={people.some((m) => m.id === assignee) ? assignee : ""}
-          onChange={(e) => setAssignee(e.target.value)}
-          className="rounded-lg border border-line bg-surface px-2 py-1.5 text-base text-muted sm:text-sm"
-          aria-label="Responsable"
-        >
-          <option value="">Sin asignar</option>
-          {people.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </select>
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Responsables">
+          {people.map((m) => {
+            const on = chosenPeople.includes(m.id);
+            return (
+              <button
+                type="button"
+                key={m.id}
+                aria-pressed={on}
+                title={m.name}
+                onClick={() => setChosenPeople((cur) => toggle(cur, m.id))}
+                className={`rounded-full p-0.5 transition ${on ? "ring-2 ring-primary" : "opacity-45 grayscale"}`}
+              >
+                <Avatar member={m} size={26} />
+              </button>
+            );
+          })}
+        </div>
       )}
       <div className="flex items-center gap-2">
         <input

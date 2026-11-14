@@ -38,7 +38,7 @@ export default function ProjectGrid({
             id: t.id,
             title: t.title,
             status: t.status,
-            assignee: t.assignee ? byId.get(t.assignee) : undefined,
+            assignees: (t.assignees ?? []).map((id) => byId.get(id)).filter((m): m is Member => !!m),
           }));
         return (
           <Link

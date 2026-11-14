@@ -41,8 +41,8 @@ export type Task = {
   title: string;
   status: TaskStatus;
   dueDate?: string; // YYYY-MM-DD
-  area?: string; // una de las partes del proyecto (p. ej. "Web", "Cliente")
-  assignee?: string; // id del miembro responsable
+  areas?: string[]; // partes del proyecto a las que afecta (vacío: vale para todo)
+  assignees?: string[]; // ids de los miembros responsables (vacío: sin asignar)
   // --- Ficha (todo opcional: una tarea sencilla sigue siendo un título) ---
   briefFrom?: string; // quién lo pidió (p. ej. "Humberto")
   brief?: string; // lo que pidió, con sus palabras

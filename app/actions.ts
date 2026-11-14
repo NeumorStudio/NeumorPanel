@@ -161,17 +161,19 @@ export async function updateProject(id: string, input: ProjectInput) {
     p.dueDate = input.dueDate || undefined;
     if (input.areas) {
       const before = (p.areas ?? []).join("|");
-      p.areas = normalizeAreas(input.areas);
-      // las tareas de una parte eliminada se quedan sin etiqueta
-      for (const t of p.tasks) if (t.area && !p.areas.includes(t.area)) delete t.area;
-      if (before !== p.areas.join("|") && changes[0] === "editó el proyecto") changes[0] = "cambió las partes del proyecto";
+      const nextAreas = normalizeAreas(input.areas);
+      p.areas = nextAreas;
+      // las tareas dejan de apuntar a una parte eliminada
+      for (const t of p.tasks) t.areas = (t.areas ?? []).filter((a) => nextAreas.includes(a));
+      if (before !== nextAreas.join("|") && changes[0] === "editó el proyecto") changes[0] = "cambió las partes del proyecto";
     }
     if (input.members) {
       const before = participantsOf(p, db.members).map((m) => m.id).sort().join("|");
-      p.members = validIds(db.members, input.members);
-      // las tareas de quien deja el proyecto se quedan sin responsable
-      for (const t of p.tasks) if (t.assignee && !p.members.includes(t.assignee)) delete t.assignee;
-      if (before !== [...p.members].sort().join("|")) changes.push("cambió los participantes del proyecto");
+      const nextMembers = validIds(db.members, input.members);
+      p.members = nextMembers;
+      // quien deja el proyecto deja de ser responsable de sus tareas
+      for (const t of p.tasks) t.assignees = (t.assignees ?? []).filter((id) => nextMembers.includes(id));
+      if (before !== [...nextMembers].sort().join("|")) changes.push("cambió los participantes del proyecto");
     }
     if (changes.length > 1 && changes[0] === "editó el proyecto") changes.shift();
     for (const c of changes) log(p, me.id, "project", c);
@@ -200,7 +202,14 @@ export async function deleteProject(id: string) {
 
 export async function addTask(
   projectId: string,
-  task: { id: string; title: string; status: TaskStatus; dueDate?: string; area?: string; assignee?: string },
+  task: {
+    id: string;
+    title: string;
+    status: TaskStatus;
+    dueDate?: string;
+    areas?: string[];
+    assignees?: string[];
+  },
 ) {
   const me = await requireUser();
   const title = task.title.trim();
@@ -208,21 +217,23 @@ export async function addTask(
   const notices = await mutateDB((db) => {
     const p = db.projects.find((x) => x.id === projectId);
     if (!p) return null;
-    const area = task.area && p.areas?.includes(task.area) ? task.area : undefined;
-    const assignee = participantsOf(p, db.members).find((m) => m.id === task.assignee)?.id;
+    const areas = normalizeAreas((task.areas ?? []).filter((a) => p.areas?.includes(a)));
+    const assignees = participantsOf(p, db.members)
+      .filter((m) => (task.assignees ?? []).includes(m.id))
+      .map((m) => m.id);
     p.tasks.push({
       id: task.id,
       title,
       status: task.status,
       dueDate: task.dueDate && /^\d{4}-\d{2}-\d{2}$/.test(task.dueDate) ? task.dueDate : undefined,
-      area,
-      assignee,
+      areas,
+      assignees,
       reviewBy: task.status === "review" ? me.id : undefined,
     });
     log(p, me.id, "task", `creó la tarea «${title}»`);
     // creada ya en Revisar: es pedir el OK (a quien la tenga también le llega por ahí)
     if (task.status === "review") return reviewNotices(db, me, p, { id: task.id, title });
-    return [taskNotice(assignee, me, p, { id: task.id, title }, "Nueva tarea para ti")];
+    return assignees.map((id) => taskNotice(id, me, p, { id: task.id, title }, "Nueva tarea para ti"));
   });
   sendNotices(notices);
   revalidateProject(projectId);
@@ -421,37 +432,37 @@ export async function deleteTaskShot(projectId: string, taskId: string, shotId: 
   revalidateProject(projectId);
 }
 
-export async function setTaskArea(projectId: string, taskId: string, area: string | null) {
+/** Una tarea puede afectar a varias partes del proyecto (o a ninguna). */
+export async function setTaskAreas(projectId: string, taskId: string, areas: string[]) {
   await requireUser();
   await mutateDB((db) => {
     const p = db.projects.find((x) => x.id === projectId);
     const t = p?.tasks.find((x) => x.id === taskId);
     if (!p || !t) return;
-    if (area && p.areas?.includes(area)) t.area = area;
-    else delete t.area;
+    t.areas = normalizeAreas((areas ?? []).filter((a) => p.areas?.includes(a)));
   });
   revalidateProject(projectId);
 }
 
-export async function setTaskAssignee(projectId: string, taskId: string, assignee: string | null) {
+/** Una tarea puede tener varios responsables (o ninguno); se avisa a los nuevos. */
+export async function setTaskAssignees(projectId: string, taskId: string, assignees: string[]) {
   const me = await requireUser();
-  const notice = await mutateDB((db) => {
+  const notices = await mutateDB((db) => {
     const p = db.projects.find((x) => x.id === projectId);
     const t = p?.tasks.find((x) => x.id === taskId);
     if (!p || !t) return null;
-    const who = participantsOf(p, db.members).find((m) => m.id === assignee);
-    if (who) {
-      const changed = t.assignee !== who.id;
-      t.assignee = who.id;
-      log(p, me.id, "task", `asignó «${t.title}» a ${who.name}`);
-      if (changed) return taskNotice(who.id, me, p, t, "Te han asignado una tarea");
-    } else if (t.assignee) {
-      delete t.assignee;
-      log(p, me.id, "task", `quitó el responsable de «${t.title}»`);
-    }
-    return null;
+    const team = participantsOf(p, db.members);
+    const before = (t.assignees ?? []).filter((id) => team.some((m) => m.id === id));
+    const next = team.filter((m) => assignees.includes(m.id)).map((m) => m.id);
+    if ([...before].sort().join("|") === [...next].sort().join("|")) return null;
+    t.assignees = next;
+    const added = team.filter((m) => next.includes(m.id) && !before.includes(m.id));
+    const removed = team.filter((m) => before.includes(m.id) && !next.includes(m.id));
+    if (added.length) log(p, me.id, "task", `asignó «${t.title}» a ${added.map((m) => m.name).join(", ")}`);
+    if (removed.length) log(p, me.id, "task", `quitó a ${removed.map((m) => m.name).join(", ")} de «${t.title}»`);
+    return added.map((m) => taskNotice(m.id, me, p, t, "Te han asignado una tarea"));
   });
-  sendNotices([notice]);
+  sendNotices(notices);
   revalidateProject(projectId);
 }
 
@@ -594,7 +605,7 @@ export async function removeMember(id: string): Promise<{ error?: string }> {
     db.members = db.members.filter((m) => m.id !== id);
     for (const p of db.projects) {
       if (p.members) p.members = p.members.filter((x) => x !== id);
-      for (const t of p.tasks) if (t.assignee === id) delete t.assignee;
+      for (const t of p.tasks) t.assignees = (t.assignees ?? []).filter((x) => x !== id);
     }
     // y deja de avisar en sus dispositivos
     if (db.push) db.push = db.push.filter((s) => s.memberId !== id);

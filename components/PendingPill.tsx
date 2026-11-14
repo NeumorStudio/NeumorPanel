@@ -11,7 +11,7 @@ export type PendingTask = {
   id: string;
   title: string;
   status: TaskStatus;
-  assignee?: Member;
+  assignees?: Member[];
 };
 
 /**
@@ -105,8 +105,12 @@ export default function PendingPill({
                       }
                     />
                     <span className="min-w-0 flex-1 break-words text-sm leading-snug">{t.title}</span>
-                    {t.assignee ? (
-                      <Avatar member={t.assignee} size={26} />
+                    {t.assignees?.length ? (
+                      <span className="flex -space-x-1.5">
+                        {t.assignees.map((m) => (
+                          <Avatar key={m.id} member={m} size={26} className="border-2 border-surface" />
+                        ))}
+                      </span>
                     ) : (
                       <span
                         title="Sin asignar"

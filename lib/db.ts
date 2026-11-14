@@ -19,6 +19,28 @@ const DEFAULT_DB: DB = {
   projects: [],
 };
 
+/**
+ * Las tareas de antes llevaban una sola parte (`area`) y un solo responsable
+ * (`assignee`). Se convierten a listas al leer, así todo el código trabaja con
+ * la forma nueva y el siguiente guardado deja el JSON ya migrado.
+ */
+type LegacyTask = DB["projects"][number]["tasks"][number] & {
+  area?: string;
+  assignee?: string;
+};
+
+function upgradeTasks(db: DB): DB {
+  for (const project of db.projects) {
+    for (const task of project.tasks as LegacyTask[]) {
+      if (!Array.isArray(task.areas)) task.areas = task.area ? [task.area] : [];
+      if (!Array.isArray(task.assignees)) task.assignees = task.assignee ? [task.assignee] : [];
+      delete task.area;
+      delete task.assignee;
+    }
+  }
+  return db;
+}
+
 // ---------- Postgres ----------
 let pool: Pool | undefined;
 let ready: Promise<void> | undefined;
@@ -38,7 +60,7 @@ function ensureTable() {
 async function pgRead(): Promise<DB> {
   await ensureTable();
   const { rows } = await getPool().query("SELECT value FROM kv WHERE key = 'db'");
-  return (rows[0]?.value as DB) ?? structuredClone(DEFAULT_DB);
+  return upgradeTasks((rows[0]?.value as DB) ?? structuredClone(DEFAULT_DB));
 }
 
 async function pgMutate<T>(fn: (db: DB) => T | Promise<T>): Promise<T> {
@@ -51,7 +73,7 @@ async function pgMutate<T>(fn: (db: DB) => T | Promise<T>): Promise<T> {
     ]);
     // FOR UPDATE bloquea la fila: dos cambios simultáneos no se pisan.
     const { rows } = await client.query("SELECT value FROM kv WHERE key = 'db' FOR UPDATE");
-    const db = rows[0].value as DB;
+    const db = upgradeTasks(rows[0].value as DB);
     const result = await fn(db);
     await client.query("UPDATE kv SET value = $1 WHERE key = 'db'", [JSON.stringify(db)]);
     await client.query("COMMIT");
@@ -69,7 +91,7 @@ let queue: Promise<unknown> = Promise.resolve();
 
 async function fileRead(): Promise<DB> {
   try {
-    return JSON.parse(await fs.readFile(FILE, "utf8")) as DB;
+    return upgradeTasks(JSON.parse(await fs.readFile(FILE, "utf8")) as DB);
   } catch {
     return structuredClone(DEFAULT_DB);
   }
