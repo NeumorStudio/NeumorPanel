@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import BrandMark from "./BrandMark";
 import ThemeToggle from "./ThemeToggle";
 import { FlaskConical, FolderKanban, KeyRound, Settings } from "lucide-react";
 
@@ -21,11 +22,7 @@ export default function Sidebar() {
     <>
     <aside className="sticky top-0 hidden h-screen w-[220px] shrink-0 flex-col gap-8 border-r border-line bg-soft px-3 py-6 sm:flex">
       <Link href="/" className="flex items-center gap-3 px-2" aria-label="NeumorPanel">
-        <span className="grid grid-cols-2 gap-1 shrink-0">
-          {[0, 1, 2, 3].map((i) => (
-            <span key={i} className="size-3 rounded-full bg-[#a3a7bf]" />
-          ))}
-        </span>
+        <BrandMark className="size-7 shrink-0" />
         <span className="font-semibold tracking-tight">NeumorPanel</span>
       </Link>
       <nav className="flex flex-col gap-1">

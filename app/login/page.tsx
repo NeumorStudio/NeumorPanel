@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth, signIn } from "@/auth";
+import BrandMark from "@/components/BrandMark";
 
 export const dynamic = "force-dynamic";
 
@@ -12,11 +13,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
     <div className="fixed inset-0 z-40 grid place-items-center bg-background p-4">
       <div className="w-full max-w-sm rounded-3xl bg-surface p-8 text-center shadow-card">
-        <span className="mx-auto mb-5 grid w-fit grid-cols-2 gap-1.5">
-          {[0, 1, 2, 3].map((i) => (
-            <span key={i} className="size-4 rounded-full bg-[#a3a7bf]" />
-          ))}
-        </span>
+        <BrandMark className="mx-auto mb-5 size-10" />
         <h1 className="text-2xl font-bold tracking-tight">NeumorPanel</h1>
         <p className="mt-1 text-muted">Los proyectos de NeumorStudio</p>
 
