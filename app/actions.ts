@@ -613,3 +613,36 @@ export async function removeMember(id: string): Promise<{ error?: string }> {
   revalidatePath("/", "layout");
   return {};
 }
+
+function isPaymentDate(value: string) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const date = new Date(value + "T00:00:00Z");
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
+}
+
+export async function recordPayment(projectId: string, id: string, paidOn: string, amount: string, nextDue: string) {
+  const me = await requireUser();
+  if (!UUID.test(id) || !isPaymentDate(paidOn)) return { error: "Revisa la fecha del cobro." };
+  if (nextDue !== "" && (!isPaymentDate(nextDue) || nextDue < paidOn)) {
+    return { error: "El próximo pago debe ser el día del cobro o después." };
+  }
+  if (typeof amount !== "string" || !/^\d+([.,]\d{1,2})?$/.test(amount)) {
+    return { error: "Introduce un importe con un máximo de dos decimales." };
+  }
+  const [euros, decimals = ""] = amount.replace(",", ".").split(".");
+  const amountCents = Number(euros + decimals.padEnd(2, "0"));
+  if (!Number.isSafeInteger(amountCents) || amountCents <= 0) return { error: "Revisa el importe." };
+
+  const result = await mutateDB((db) => {
+    const project = db.projects.find((p) => p.id === projectId);
+    if (!project) return { error: "El proyecto ya no está disponible." };
+    project.payments ??= [];
+    if (!project.payments.some((p) => p.id === id)) {
+      project.payments.unshift({ id, paidOn, amountCents, nextDue: nextDue || undefined });
+      log(project, me.id, "project", "registró un pago");
+    }
+    return {};
+  });
+  revalidateProject(projectId);
+  return result;
+}

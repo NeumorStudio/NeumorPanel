@@ -76,6 +76,13 @@ export type Activity = {
 /** "lab" = proyectos de prueba propios; sin valor = proyecto de cliente. */
 export type ProjectKind = "client" | "lab";
 
+export type Payment = {
+  id: string;
+  paidOn: string;
+  amountCents: number;
+  nextDue?: string;
+};
+
 export type Project = {
   id: string;
   name: string;
@@ -88,6 +95,7 @@ export type Project = {
   areas?: string[]; // partes del proyecto, para etiquetar tareas
   members?: string[]; // ids de los participantes (si falta: todo el equipo)
   links?: ProjectLink[];
+  payments?: Payment[];
   activity?: Activity[]; // la más reciente primero
   createdAt: string;
 };

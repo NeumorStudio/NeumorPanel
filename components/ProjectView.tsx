@@ -19,6 +19,7 @@ import {
 import Cover from "./Cover";
 import ProjectDialog from "./ProjectDialog";
 import Avatar from "./Avatar";
+import PaymentsTab from "./PaymentsTab";
 import FilesTab from "./FilesTab";
 import ActivityTab from "./ActivityTab";
 import OptionMenu from "./OptionMenu";
@@ -32,6 +33,7 @@ import { addTask, deleteProject, deleteTask, setTaskAreas, setTaskAssignees, set
 const TABS = [
   { id: "tasks", label: "Tareas" },
   { id: "files", label: "Archivos" },
+  { id: "payments", label: "Pagos" },
   { id: "activity", label: "Actividad" },
 ] as const;
 
@@ -56,7 +58,7 @@ export default function ProjectView({
   const [tasks, setTasks] = useState<Task[]>(project.tasks);
   const [menu, setMenu] = useState(false);
   const [editing, setEditing] = useState(false);
-  const [tab, setTab] = useState<"tasks" | "files" | "activity">("tasks");
+  const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("tasks");
   const [dragId, setDragId] = useState<string | null>(null);
   const [overCol, setOverCol] = useState<TaskStatus | null>(null);
   const [filter, setFilter] = useState<string | null>(null);
@@ -214,7 +216,7 @@ export default function ProjectView({
         </aside>
       </section>
 
-      <div className="mt-10 mb-4 flex gap-6 border-b border-line">
+      <div className="mt-10 mb-4 flex gap-3 overflow-x-auto sm:gap-6 border-b border-line">
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -233,6 +235,7 @@ export default function ProjectView({
       </div>
 
       {tab === "files" && <FilesTab project={project} members={members} />}
+      {tab === "payments" && <PaymentsTab project={project} />}
       {tab === "activity" && <ActivityTab project={project} members={members} />}
 
       {tab === "tasks" && areas.length > 0 && (
