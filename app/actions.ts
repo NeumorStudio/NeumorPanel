@@ -620,8 +620,9 @@ function isPaymentDate(value: string) {
   return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value;
 }
 
-export async function recordPayment(projectId: string, id: string, paidOn: string, amount: string, nextDue: string) {
+export async function recordPayment(projectId: string, id: string, paidOn: string, amount: string, nextDue: string, concept = "") {
   const me = await requireUser();
+  const note = typeof concept === "string" ? concept.trim().slice(0, 80) : "";
   if (!UUID.test(id) || !isPaymentDate(paidOn)) return { error: "Revisa la fecha del cobro." };
   if (nextDue !== "" && (!isPaymentDate(nextDue) || nextDue < paidOn)) {
     return { error: "El próximo pago debe ser el día del cobro o después." };
@@ -638,11 +639,25 @@ export async function recordPayment(projectId: string, id: string, paidOn: strin
     if (!project) return { error: "El proyecto ya no está disponible." };
     project.payments ??= [];
     if (!project.payments.some((p) => p.id === id)) {
-      project.payments.unshift({ id, paidOn, amountCents, nextDue: nextDue || undefined });
+      project.payments.unshift({ id, paidOn, amountCents, nextDue: nextDue || undefined, concept: note || undefined });
       log(project, me.id, "project", "registró un pago");
     }
     return {};
   });
   revalidateProject(projectId);
   return result;
+}
+
+const euros = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
+
+export async function deletePayment(projectId: string, paymentId: string) {
+  const me = await requireUser();
+  await mutateDB((db) => {
+    const project = db.projects.find((p) => p.id === projectId);
+    const payment = project?.payments?.find((p) => p.id === paymentId);
+    if (!project || !payment) return;
+    project.payments = project.payments?.filter((p) => p.id !== paymentId);
+    log(project, me.id, "project", `eliminó un cobro de ${euros.format(payment.amountCents / 100)}`);
+  });
+  revalidateProject(projectId);
 }

@@ -81,6 +81,7 @@ export type Payment = {
   paidOn: string;
   amountCents: number;
   nextDue?: string;
+  concept?: string; // "Web", "Mantenimiento noviembre"…
 };
 
 export type Project = {

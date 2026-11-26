@@ -3,6 +3,7 @@ import Cover from "./Cover";
 import PendingPill from "./PendingPill";
 import { getTheme } from "@/lib/themes";
 import { projectPath } from "@/lib/paths";
+import { isOverdue, nextDueOf, todayISO } from "@/lib/payments";
 import type { Member, Project } from "@/lib/types";
 
 /** Rejilla de tarjetas de proyecto; la comparten Proyectos y Lab. */
@@ -18,6 +19,7 @@ export default function ProjectGrid({
   emptyHint: string;
 }) {
   const byId = new Map(members.map((m) => [m.id, m]));
+  const today = todayISO();
 
   if (projects.length === 0) {
     return (
@@ -53,7 +55,10 @@ export default function ProjectGrid({
             </Cover>
             <div className="p-5">
               <h2 className="text-xl font-semibold">{p.name}</h2>
-              <p className="mt-0.5 min-h-6 text-muted">{p.category}</p>
+              <p className="mt-0.5 min-h-6 text-muted">
+                {p.category}
+                {isOverdue(nextDueOf(p), today) && <span className="ml-2 font-medium text-red-500">· Pago vencido</span>}
+              </p>
             </div>
           </Link>
         );
